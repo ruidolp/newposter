@@ -244,6 +244,40 @@ export interface OperationLogs {
   created_at: Generated<Timestamp | null>;
 }
 
+export interface ProductCostHistory {
+  id: Generated<string>;
+  tenant_id: string | null;
+  product_id: string | null;
+  source: string;
+  previous_cost: Numeric | null;
+  new_cost: Numeric;
+  currency: Generated<string>;
+  purchase_id: string | null;
+  purchase_item_id: string | null;
+  supplier_id: string | null;
+  invoice_number: string | null;
+  reason: string | null;
+  created_by: string | null;
+  created_at: Generated<Timestamp | null>;
+}
+
+export interface ProductPriceHistory {
+  id: Generated<string>;
+  tenant_id: string | null;
+  product_id: string | null;
+  source: string;
+  previous_price: Numeric | null;
+  new_price: Numeric;
+  currency: Generated<string>;
+  purchase_id: string | null;
+  purchase_item_id: string | null;
+  supplier_id: string | null;
+  invoice_number: string | null;
+  reason: string | null;
+  created_by: string | null;
+  created_at: Generated<Timestamp | null>;
+}
+
 export interface DB {
   brands: Brands;
   categories: Categories;
@@ -252,6 +286,8 @@ export interface DB {
   operation_logs: OperationLogs;
   order_items: OrderItems;
   orders: Orders;
+  product_cost_history: ProductCostHistory;
+  product_price_history: ProductPriceHistory;
   product_variants: ProductVariants;
   products: Products;
   promotions: Promotions;

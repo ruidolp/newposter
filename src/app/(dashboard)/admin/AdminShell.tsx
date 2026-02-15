@@ -8,7 +8,14 @@ import {
   Truck,
   LogOut,
   FileText,
-  BarChart3,
+  Package,
+  Tags,
+  PenLine,
+  ClipboardList,
+  ChevronDown,
+  Settings,
+  Users,
+  UserCircle2,
 } from 'lucide-react'
 
 interface AdminShellProps {
@@ -16,15 +23,47 @@ interface AdminShellProps {
   children: React.ReactNode
 }
 
-const NAV = [
-  { label: 'Compras',     href: '/admin/compras',    icon: ShoppingCart },
-  { label: 'Proveedores', href: '/admin/proveedores', icon: Truck },
-  { label: 'Log Operaciones', href: '/admin/logs',   icon: FileText },
+interface NavItem {
+  label: string
+  href: string
+  icon: React.ElementType
+  children?: { label: string; href: string; icon: React.ElementType }[]
+}
+
+const NAV: NavItem[] = [
+  { label: 'Productos',       href: '/admin/productos',   icon: Package },
+  { label: 'Categorías',      href: '/admin/categorias',  icon: Tags },
+  {
+    label: 'Compras',
+    href: '/admin/compras',
+    icon: ShoppingCart,
+    children: [
+      { label: 'Nueva Compra', href: '/admin/compras/nueva',     icon: PenLine },
+      { label: 'Historial',    href: '/admin/compras/historial', icon: ClipboardList },
+    ],
+  },
+  { label: 'Proveedores',     href: '/admin/proveedores', icon: Truck },
+  { label: 'Clientes',        href: '/admin/clientes',    icon: UserCircle2 },
+  { label: 'Usuarios',        href: '/admin/usuarios',    icon: Users },
+  { label: 'Log Operaciones', href: '/admin/logs',        icon: FileText },
+  { label: 'Configuración',   href: '/admin/configuracion', icon: Settings },
 ]
 
 export default function AdminShell({ user, children }: AdminShellProps) {
   const pathname = usePathname()
   const router = useRouter()
+
+  // Auto-expand parent if a child route is active
+  const [expanded, setExpanded] = useState<string[]>(() =>
+    NAV.filter(n => n.children?.some(c => pathname.startsWith(c.href)))
+       .map(n => n.href)
+  )
+
+  function toggleExpand(href: string) {
+    setExpanded(prev =>
+      prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href]
+    )
+  }
 
   const initials = user.name
     .split(' ')
@@ -33,9 +72,16 @@ export default function AdminShell({ user, children }: AdminShellProps) {
     .toUpperCase()
     .slice(0, 2)
 
-  // Determine breadcrumb
-  const currentNav = NAV.find((n) => pathname.startsWith(n.href))
-  const section = currentNav?.label ?? 'Admin'
+  // Breadcrumb: find active child or parent
+  let section = 'Admin'
+  for (const item of NAV) {
+    if (item.children) {
+      const child = item.children.find(c => pathname.startsWith(c.href))
+      if (child) { section = `${item.label} · ${child.label}`; break }
+    } else if (pathname.startsWith(item.href)) {
+      section = item.label; break
+    }
+  }
 
   return (
     <div className="admin-layout">
@@ -57,11 +103,52 @@ export default function AdminShell({ user, children }: AdminShellProps) {
           <div className="admin-sidebar-section-label">Módulos</div>
           {NAV.map((item) => {
             const Icon = item.icon
-            const active = pathname.startsWith(item.href)
+            const isParentActive = item.children
+              ? item.children.some(c => pathname.startsWith(c.href))
+              : pathname.startsWith(item.href)
+            const isExpanded = expanded.includes(item.href)
+
+            if (item.children) {
+              return (
+                <div key={item.href}>
+                  <button
+                    className={`admin-nav-item${isParentActive ? ' active' : ''}`}
+                    onClick={() => toggleExpand(item.href)}
+                  >
+                    <Icon className="admin-nav-icon" size={15} />
+                    {item.label}
+                    <ChevronDown
+                      size={13}
+                      className="admin-nav-chevron"
+                      style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    />
+                  </button>
+                  {isExpanded && (
+                    <div className="admin-nav-subitems">
+                      {item.children.map(child => {
+                        const ChildIcon = child.icon
+                        const childActive = pathname.startsWith(child.href)
+                        return (
+                          <button
+                            key={child.href}
+                            className={`admin-nav-subitem${childActive ? ' active' : ''}`}
+                            onClick={() => router.push(child.href)}
+                          >
+                            <ChildIcon size={13} />
+                            {child.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
             return (
               <button
                 key={item.href}
-                className={`admin-nav-item${active ? ' active' : ''}`}
+                className={`admin-nav-item${isParentActive ? ' active' : ''}`}
                 onClick={() => router.push(item.href)}
               >
                 <Icon className="admin-nav-icon" size={15} />

@@ -103,7 +103,9 @@ export async function POST(request: NextRequest) {
         sku: processedData.sku,
         barcode: processedData.barcode || null,
         base_price: processedData.base_price.toString(),
-        cost: processedData.cost ? processedData.cost.toString() : null,
+        cost: processedData.cost !== null && processedData.cost !== undefined
+          ? processedData.cost.toString()
+          : null,
         category_id: processedData.category_id || null,
         stock: processedData.stock || 0,
         low_stock_alert: processedData.low_stock_alert || 5,
@@ -113,6 +115,36 @@ export async function POST(request: NextRequest) {
       })
       .returningAll()
       .executeTakeFirstOrThrow()
+
+    if (product.cost !== null) {
+      await db
+        .insertInto('product_cost_history')
+        .values({
+          tenant_id: tenant.id as any,
+          product_id: product.id,
+          source: 'MANUAL',
+          previous_cost: null,
+          new_cost: product.cost,
+          currency: 'CLP',
+          reason: 'Costo inicial al crear producto',
+          created_by: null,
+        })
+        .execute()
+    }
+
+    await db
+      .insertInto('product_price_history')
+      .values({
+        tenant_id: tenant.id as any,
+        product_id: product.id,
+        source: 'MANUAL',
+        previous_price: null,
+        new_price: product.base_price,
+        currency: 'CLP',
+        reason: 'Precio inicial al crear producto',
+        created_by: null,
+      })
+      .execute()
 
     // Execute afterCreate hook
     await afterCreateProduct(product, tenant.id as string)
