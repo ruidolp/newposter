@@ -1,5 +1,6 @@
 import { db } from '@/database/db'
 import { notFound } from 'next/navigation'
+import { extractStorefrontEditorConfig } from '@/lib/storefront-editor'
 
 export default async function StorefrontLayout({
   children,
@@ -29,17 +30,18 @@ export default async function StorefrontLayout({
     .where('tenant_id', '=', tenant.id)
     .executeTakeFirst()
 
+  const editor = extractStorefrontEditorConfig(settings?.metadata)
+  const colors = editor.colors
+
   return (
-    <div className="min-h-screen">
-      <header className="border-b bg-white">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">{tenant.name}</h1>
-        </div>
-      </header>
+    <div className="min-h-screen" style={{ backgroundColor: colors.background, color: colors.text }}>
       <main>{children}</main>
-      <footer className="border-t bg-gray-50 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-8 text-center text-gray-600">
-          <p>&copy; {new Date().getFullYear()} {tenant.name}. Powered by VentaFácil.</p>
+      <footer
+        className="mt-12 border-t"
+        style={{ backgroundColor: colors.surface, borderColor: colors.accent }}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-8 text-center" style={{ color: colors.mutedText }}>
+          <p>&copy; {new Date().getFullYear()} {tenant.name}. Powered by posfer.com.</p>
         </div>
       </footer>
     </div>

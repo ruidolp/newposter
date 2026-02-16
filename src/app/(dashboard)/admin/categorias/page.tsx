@@ -1,7 +1,7 @@
 'use client'
 
 import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, X, CheckCircle2, AlertCircle, Info, Search, Tags } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Plus, Search, Tags, Trash2, X } from 'lucide-react'
 
 interface Category {
   id: string
@@ -14,7 +14,7 @@ interface Category {
 
 interface Toast {
   id: number
-  type: 'success' | 'error' | 'info'
+  type: 'success' | 'error'
   msg: string
 }
 
@@ -24,17 +24,35 @@ interface LinkedProduct {
   sku: string
 }
 
-function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+function Toasts({
+  toasts,
+  onRemove,
+}: {
+  toasts: Toast[]
+  onRemove: (id: number) => void
+}) {
   return (
-    <div className="admin-toast-container">
+    <div className="fixed right-4 top-4 z-[90] space-y-2">
       {toasts.map((t) => (
-        <div key={t.id} className={`admin-toast ${t.type}`}>
-          <span className={`admin-toast-icon ${t.type}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : <Info size={15} />}
-          </span>
-          <span className="admin-toast-msg">{t.msg}</span>
-          <button className="admin-btn-icon" style={{ marginLeft: 'auto' }} onClick={() => onRemove(t.id)}>
-            <X size={13} />
+        <div
+          key={t.id}
+          role="status"
+          aria-live="polite"
+          className={`flex min-w-[280px] items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-sm ${
+            t.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {t.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+          <span className="flex-1">{t.msg}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(t.id)}
+            className="rounded p-1 transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            aria-label="Cerrar mensaje"
+          >
+            <X size={14} />
           </button>
         </div>
       ))}
@@ -95,78 +113,105 @@ function CategoryModal({
 
       const saved = await res.json()
       onSaved(saved)
-    } catch (e: any) {
-      setError(e.message || 'Error al guardar categoría')
+    } catch (e: unknown) {
+      setError((e as Error).message || 'Error al guardar categoría')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="admin-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="admin-modal" style={{ maxWidth: 500 }}>
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">{category ? 'Editar Categoría' : 'Nueva Categoría'}</span>
-          <button className="admin-btn-icon" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">{category ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
 
-        <div className="admin-modal-body">
+        <div className="space-y-4 px-5 py-4">
           {error && (
-            <div className="prod-error-banner" style={{ marginBottom: 14 }}>
-              <AlertCircle size={14} /> {error}
-            </div>
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
           )}
 
-          <div className="admin-form-grid cols-1">
-            <div className="admin-form-field">
-              <label className="admin-label">Nombre *</label>
-              <input
-                className="admin-input"
-                placeholder="Ej: Bebidas"
-                value={name}
-                onChange={(e) => {
-                  const nextName = e.target.value
-                  setName(nextName)
-                  if (!slugTouched) setSlug(toSlug(nextName))
-                }}
-                autoFocus
-              />
-            </div>
-            <div className="admin-form-field">
-              <label className="admin-label">Slug</label>
-              <input
-                className="admin-input mono"
-                placeholder="ej: bebidas"
-                value={slug}
-                onChange={(e) => {
-                  setSlugTouched(true)
-                  setSlug(toSlug(e.target.value))
-                }}
-              />
-              <span style={{ marginTop: 4, fontSize: 11, color: 'var(--a-text-3)' }}>
-                Se usa como identificador legible para URLs e integraciones técnicas.
-              </span>
-            </div>
-            <div className="admin-form-field">
-              <label className="admin-label">Descripción</label>
-              <textarea
-                className="admin-textarea"
-                rows={3}
-                placeholder="Opcional"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label htmlFor="category_name" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Nombre *
+            </label>
+            <input
+              id="category_name"
+              name="category_name"
+              value={name}
+              autoFocus
+              onChange={(e) => {
+                const next = e.target.value
+                setName(next)
+                if (!slugTouched) setSlug(toSlug(next))
+              }}
+              placeholder="Ej: Bebidas"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="category_slug" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Slug
+            </label>
+            <input
+              id="category_slug"
+              name="category_slug"
+              value={slug}
+              onChange={(e) => {
+                setSlugTouched(true)
+                setSlug(toSlug(e.target.value))
+              }}
+              placeholder="ej: bebidas"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+            <p className="text-xs text-slate-500">Se usa como identificador legible para URLs e integraciones técnicas.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="category_description" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Descripción
+            </label>
+            <textarea
+              id="category_description"
+              name="category_description"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Opcional…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
           </div>
         </div>
 
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <span className="admin-spinner" /> : <CheckCircle2 size={14} />}
-            {category ? 'Guardar cambios' : 'Crear categoría'}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 disabled:opacity-60"
+          >
+            <CheckCircle2 size={14} className={saving ? 'animate-pulse' : ''} />
+            {category ? 'Guardar Cambios' : 'Crear Categoría'}
           </button>
         </div>
       </div>
@@ -191,40 +236,39 @@ function ConfirmDeleteModal({
   const isBlocked = linkedProducts.length > 0
 
   return (
-    <div className="admin-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="admin-modal" style={{ maxWidth: 460 }}>
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">Eliminar categoría</span>
-          <button className="admin-btn-icon" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">Eliminar Categoría</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            aria-label="Cerrar"
+          >
             <X size={16} />
           </button>
         </div>
 
-        <div className="admin-modal-body">
+        <div className="space-y-3 px-5 py-4 text-sm text-slate-600">
           {!isBlocked ? (
-            <p style={{ color: 'var(--a-text-2)', fontSize: 14 }}>
-              ¿Eliminar la categoría <strong style={{ color: 'var(--a-text-1)' }}>{category.name}</strong>? Esta acción no se puede deshacer.
+            <p>
+              ¿Eliminar la categoría <strong className="text-slate-900">{category.name}</strong>? Esta acción no se puede deshacer.
             </p>
           ) : (
             <>
-              <div className="prod-error-banner" style={{ marginBottom: 12 }}>
-                <AlertCircle size={14} />
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">
                 Esta categoría está asociada a {linkedProducts.length} producto(s).
               </div>
-              <p style={{ color: 'var(--a-text-2)', fontSize: 13, marginBottom: 8 }}>
-                Si continúas, se quitará esta categoría de los siguientes productos:
-              </p>
-              <div style={{
-                maxHeight: 180, overflowY: 'auto', border: '1px solid var(--a-border)',
-                borderRadius: 'var(--a-radius-sm)', background: 'var(--a-bg-0)',
-              }}>
+              <p>Si continúas, se quitará esta categoría de los siguientes productos:</p>
+              <div className="max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-slate-50">
                 {linkedProducts.map((p) => (
-                  <div key={p.id} style={{
-                    display: 'flex', justifyContent: 'space-between', gap: 8,
-                    padding: '8px 10px', borderBottom: '1px solid var(--a-border)',
-                  }}>
-                    <span style={{ color: 'var(--a-text-1)', fontSize: 13, fontWeight: 500 }}>{p.name}</span>
-                    <span className="admin-mono" style={{ color: 'var(--a-text-3)', fontSize: 11 }}>{p.sku}</span>
+                  <div key={p.id} className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 last:border-b-0">
+                    <span className="text-sm font-medium text-slate-900">{p.name}</span>
+                    <span className="font-mono text-xs text-slate-500">{p.sku}</span>
                   </div>
                 ))}
               </div>
@@ -232,35 +276,28 @@ function ConfirmDeleteModal({
           )}
         </div>
 
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          {!isBlocked ? (
-            <button
-              className="admin-btn admin-btn-danger"
-              disabled={loading}
-              onClick={async () => {
-                setLoading(true)
-                await onConfirm()
-                setLoading(false)
-              }}
-            >
-              {loading ? <span className="admin-spinner" /> : <Trash2 size={14} />}
-              Eliminar
-            </button>
-          ) : (
-            <button
-              className="admin-btn admin-btn-danger"
-              disabled={loading}
-              onClick={async () => {
-                setLoading(true)
-                await onForceConfirm()
-                setLoading(false)
-              }}
-            >
-              {loading ? <span className="admin-spinner" /> : <Trash2 size={14} />}
-              Eliminar y desvincular
-            </button>
-          )}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true)
+              if (isBlocked) await onForceConfirm()
+              else await onConfirm()
+              setLoading(false)
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:opacity-60"
+          >
+            <Trash2 size={14} />
+            {loading ? 'Procesando…' : isBlocked ? 'Eliminar y Desvincular' : 'Eliminar'}
+          </button>
         </div>
       </div>
     </div>
@@ -304,8 +341,8 @@ export default function CategoriasPage() {
 
   function toast(type: Toast['type'], msg: string) {
     const id = Date.now()
-    setToasts((t) => [...t, { id, type, msg }])
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500)
+    setToasts((prev) => [...prev, { id, type, msg }])
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500)
   }
 
   function handleSaved(c: Category) {
@@ -318,7 +355,6 @@ export default function CategoriasPage() {
       }
       return [c, ...prev].sort((a, b) => a.name.localeCompare(b.name, 'es'))
     })
-
     toast('success', editing ? 'Categoría actualizada' : 'Categoría creada')
     setShowModal(false)
     setEditing(null)
@@ -341,26 +377,24 @@ export default function CategoriasPage() {
       toast('success', `"${deleting.name}" eliminada`)
       setDeleting(null)
       setLinkedProducts([])
-    } catch (e: any) {
-      toast('error', e.message || 'Error al eliminar categoría')
+    } catch (e: unknown) {
+      toast('error', (e as Error).message || 'Error al eliminar categoría')
     }
   }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return categories
-    return categories.filter((c) =>
-      c.name.toLowerCase().includes(q) ||
-      (c.description ?? '').toLowerCase().includes(q) ||
-      c.slug.toLowerCase().includes(q)
+    return categories.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.description ?? '').toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q)
     )
   }, [categories, search])
 
-  const selectedCount = selectedIds.length
-
   function handleRowClick(e: ReactMouseEvent<HTMLTableRowElement>, row: Category, rowIndex: number) {
     const withModifiers = e.metaKey || e.ctrlKey || e.shiftKey
-
     if (!withModifiers) {
       setEditing(row)
       setShowModal(true)
@@ -381,16 +415,13 @@ export default function CategoriasPage() {
       }
     }
 
-    setSelectedIds((prev) => {
-      if (prev.includes(row.id)) return prev.filter((id) => id !== row.id)
-      return [...prev, row.id]
-    })
+    setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))
     setLastSelectedId(row.id)
   }
 
   async function handleBulkDelete() {
+    const selectedCount = selectedIds.length
     if (selectedCount === 0) return
-
     const selected = categories.filter((c) => selectedIds.includes(c.id))
     if (selected.length === 1) {
       setLinkedProducts([])
@@ -405,7 +436,6 @@ export default function CategoriasPage() {
 
     const deletedIds: string[] = []
     let failed = 0
-
     for (const item of selected) {
       try {
         const res = await fetch(`/api/categories/${item.id}?force=true`, { method: 'DELETE' })
@@ -422,9 +452,7 @@ export default function CategoriasPage() {
       setSelectedIds((prev) => prev.filter((id) => !removed.has(id)))
       toast('success', `${deletedIds.length} categoría(s) eliminada(s)`)
     }
-    if (failed > 0) {
-      toast('error', `${failed} categoría(s) no se pudieron eliminar`)
-    }
+    if (failed > 0) toast('error', `${failed} categoría(s) no se pudieron eliminar`)
   }
 
   function clearSelection() {
@@ -432,105 +460,86 @@ export default function CategoriasPage() {
     setLastSelectedId(null)
   }
 
+  const selectedCount = selectedIds.length
+
   return (
-    <>
-      <div className="admin-page-header">
+    <section className="space-y-5">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="admin-page-title">Gestión de <span>Categorías</span></h1>
-          <p className="admin-page-subtitle">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 [text-wrap:balance]">
+            Gestión de <span className="text-fuchsia-600">Categorías</span>
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
             {categories.length} categoría{categories.length !== 1 ? 's' : ''} registrada{categories.length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
-          className="admin-btn admin-btn-primary admin-btn-lg"
+          type="button"
           onClick={() => {
             setEditing(null)
             setShowModal(true)
           }}
+          className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2"
         >
-          <Plus size={16} /> Nueva Categoría
+          <Plus size={16} />
+          Nueva Categoría
         </button>
-      </div>
+      </header>
 
-      <div className="admin-panel">
-        <div className="admin-panel-header">
-          <span className="admin-panel-title">Listado</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ position: 'relative' }}>
-              <Search
-                size={13}
-                style={{
-                  position: 'absolute',
-                  left: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--a-text-3)',
-                }}
-              />
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">Listado</h2>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                className="admin-input admin-input-sm"
-                style={{ paddingLeft: 30, width: 240 }}
-                placeholder="Buscar categoría..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar categoría…"
+                className="h-9 w-full min-w-[240px] rounded-md border border-slate-300 pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
               />
             </div>
-            <span style={{ fontSize: 11, color: 'var(--a-text-3)' }}>
+            <span className="text-xs text-slate-500">
               Selección: <strong>Shift + click</strong> o <strong>Ctrl/Cmd + click</strong>
             </span>
           </div>
         </div>
 
         {loading ? (
-          <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-            <span className="admin-spinner" />
-          </div>
+          <div className="flex items-center justify-center px-4 py-14 text-sm text-slate-500">Cargando…</div>
         ) : filtered.length === 0 ? (
-          <div className="admin-empty">
-            <Tags size={36} className="admin-empty-icon" />
-            <p className="admin-empty-text">Sin categorías{search ? ' que coincidan' : ''}</p>
+          <div className="px-4 py-14 text-center text-slate-500">
+            <Tags size={34} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">Sin categorías{search ? ' que coincidan' : ''}</p>
           </div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th>Nombre</th>
-                  <th>Descripción</th>
-                  <th>Slug</th>
-                  <th style={{ textAlign: 'center' }}>Productos</th>
-                  <th>Creada</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Descripción</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Slug</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Productos</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Creada</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((c, rowIndex) => (
                   <tr
                     key={c.id}
-                    style={{
-                      cursor: 'pointer',
-                      background: selectedIds.includes(c.id) ? 'var(--a-accent-dim)' : undefined,
-                    }}
                     onClick={(e) => handleRowClick(e, c, rowIndex)}
+                    className={`cursor-pointer hover:bg-slate-50/70 ${selectedIds.includes(c.id) ? 'bg-fuchsia-50/60' : ''}`}
                   >
-                    <td>
-                      <span style={{ fontWeight: 600 }}>{c.name}</span>
-                    </td>
-                    <td style={{ color: 'var(--a-text-2)' }}>
-                      {c.description ? c.description : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
-                    </td>
-                    <td>
-                      <span className="admin-mono" style={{ fontSize: 11 }}>
-                        {c.slug}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className="admin-badge admin-badge-info">
+                    <td className="px-4 py-3 font-semibold text-slate-900">{c.name}</td>
+                    <td className="px-4 py-3 text-slate-600">{c.description || <span className="text-slate-400">—</span>}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.slug}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
                         {c.products_count ?? 0}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--a-text-2)', fontSize: 12 }}>
-                      {new Date(c.created_at).toLocaleDateString('es-CL')}
-                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{new Date(c.created_at).toLocaleDateString('es-CL')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -540,31 +549,23 @@ export default function CategoriasPage() {
       </div>
 
       {selectedCount > 0 && (
-        <div
-          style={{
-            position: 'fixed',
-            left: '50%',
-            bottom: 22,
-            transform: 'translateX(-50%)',
-            zIndex: 450,
-            background: 'var(--a-bg-1)',
-            border: '1px solid var(--a-border-med)',
-            borderRadius: '999px',
-            padding: '8px 10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            boxShadow: 'var(--a-shadow-lg)',
-          }}
-        >
-          <span style={{ fontSize: 12, color: 'var(--a-text-1)', fontWeight: 600 }}>
+        <div className="fixed bottom-6 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 shadow-lg">
+          <span className="text-xs font-semibold text-slate-800">
             {selectedCount} seleccionada{selectedCount !== 1 ? 's' : ''}
           </span>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={clearSelection}>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+          >
             Limpiar
           </button>
-          <button className="admin-btn admin-btn-danger admin-btn-sm" onClick={handleBulkDelete}>
-            <Trash2 size={13} />
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2"
+          >
+            <Trash2 size={12} />
             Eliminar
           </button>
         </div>
@@ -585,13 +586,16 @@ export default function CategoriasPage() {
         <ConfirmDeleteModal
           category={deleting}
           linkedProducts={linkedProducts}
-          onClose={() => { setDeleting(null); setLinkedProducts([]) }}
+          onClose={() => {
+            setDeleting(null)
+            setLinkedProducts([])
+          }}
           onConfirm={() => handleDelete(false)}
           onForceConfirm={() => handleDelete(true)}
         />
       )}
 
-      <Toasts toasts={toasts} onRemove={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
-    </>
+      <Toasts toasts={toasts} onRemove={(id) => setToasts((prev) => prev.filter((x) => x.id !== id))} />
+    </section>
   )
 }

@@ -1,15 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/database/db'
 
 export async function GET(
-  request: Request,
-  { params }: { params: { slug: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const { slug } = await params
     const tenant = await db
       .selectFrom('tenants')
       .select(['id', 'slug', 'name', 'active'])
-      .where('slug', '=', params.slug)
+      .where('slug', '=', slug)
       .where('active', '=', true)
       .executeTakeFirst()
 

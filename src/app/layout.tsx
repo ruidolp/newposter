@@ -6,7 +6,7 @@ import { loadExtensions } from '@/lib/extensions/loader'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'VentaFácil - POS & Ecommerce',
+  title: 'posfer.com - POS & Ecommerce',
   description: 'Sistema de ventas y comercio electrónico',
 }
 

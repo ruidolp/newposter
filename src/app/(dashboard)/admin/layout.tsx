@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth-options'
 import './admin.css'
 import AdminShell from './AdminShell'
 
-export const metadata = { title: 'Admin — VentaFácil' }
+export const metadata = { title: 'Admin — posfer.com' }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const role = (session.user as any)?.role as string
   if (!['ADMIN', 'OWNER'].includes(role)) {
-    redirect('/pos')
+    redirect(role === 'EMPLOYEE' ? '/rrhh/dashboard' : '/pos')
   }
 
   return (

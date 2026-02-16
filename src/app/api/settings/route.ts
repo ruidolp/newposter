@@ -35,6 +35,7 @@ export async function PUT(request: NextRequest) {
       language,
       currency,
       timezone,
+      print_ticket,
       country,
       currency_symbol,
       decimal_separator,
@@ -52,6 +53,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const metadata = {
+      print_ticket: print_ticket === true,
       country: country ?? '',
       currency_symbol: currency_symbol ?? '',
       decimal_separator: decimal_separator ?? '.',

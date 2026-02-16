@@ -73,6 +73,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.email !== undefined) updates.email = body.email?.trim().toLowerCase() || null
     if (body.phone !== undefined) updates.phone = body.phone?.trim() || null
     if (body.address !== undefined) updates.address = body.address?.trim() || null
+
+    // loyalty_override stored in metadata
+    if ('loyalty_override' in body) {
+      const existingFull = await db.selectFrom('customers').select('metadata').where('id', '=', id).executeTakeFirst()
+      const prevMeta = (existingFull?.metadata ?? {}) as Record<string, unknown>
+      if (body.loyalty_override) prevMeta.loyalty_override = body.loyalty_override
+      else delete prevMeta.loyalty_override
+      updates.metadata = JSON.stringify(prevMeta)
+    }
+
     updates.updated_at = new Date()
 
     const updated = await db

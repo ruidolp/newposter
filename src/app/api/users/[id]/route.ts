@@ -5,7 +5,7 @@ import { db } from '@/database/db'
 import { requireTenant } from '@/lib/tenant'
 import { logOperation } from '@/lib/operation-log'
 
-const ALLOWED_ROLES = ['OWNER', 'ADMIN', 'STAFF', 'CASHIER']
+const ALLOWED_ROLES = ['OWNER', 'ADMIN', 'STAFF', 'CASHIER', 'EMPLOYEE']
 
 async function getAdminToken(request: NextRequest) {
   const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET })

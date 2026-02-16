@@ -1,35 +1,71 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Plus, Pencil, Trash2, X, CheckCircle2, AlertCircle, Info,
-  Search, UserCircle2,
+  AlertCircle,
+  CheckCircle2,
+  Plus,
+  Search,
+  UserCircle2,
+  X,
 } from 'lucide-react'
+import { DEFAULT_TIERS, getTierStyle } from '@/lib/loyalty'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Customer {
-  id: string; name: string; email: string | null; phone: string | null
-  address: string | null; created_at: string; updated_at: string
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  created_at: string
+  updated_at: string
+  metadata?: Record<string, unknown>
+  total_orders?: number
+  total_amount?: number
+  tier_id?: string
+  tier_name?: string
 }
 
-interface Toast { id: number; type: 'success' | 'error' | 'info'; msg: string }
+interface Toast {
+  id: number
+  type: 'success' | 'error'
+  msg: string
+}
 
-const emptyForm = () => ({ name: '', email: '', phone: '', address: '' })
+type CustomerFormState = {
+  name: string
+  email: string
+  phone: string
+  address: string
+}
 
-// ─── Toast ───────────────────────────────────────────────────────────────────
+function emptyForm(): CustomerFormState {
+  return { name: '', email: '', phone: '', address: '' }
+}
+
+// ── Toasts ────────────────────────────────────────────────────────────────────
 
 function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
   return (
-    <div className="admin-toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className={`admin-toast ${t.type}`}>
-          <span className={`admin-toast-icon ${t.type}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : <Info size={15} />}
-          </span>
-          <span className="admin-toast-msg">{t.msg}</span>
-          <button className="admin-btn-icon" style={{ marginLeft: 'auto' }} onClick={() => onRemove(t.id)}>
-            <X size={13} />
+    <div className="fixed right-4 top-4 z-[90] space-y-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          role="status"
+          aria-live="polite"
+          className={`flex min-w-[280px] items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-sm ${
+            t.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {t.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+          <span className="flex-1">{t.msg}</span>
+          <button type="button" onClick={() => onRemove(t.id)} aria-label="Cerrar mensaje"
+            className="rounded p-1 transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
+            <X size={14} />
           </button>
         </div>
       ))}
@@ -37,7 +73,7 @@ function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) 
   )
 }
 
-// ─── Modal ───────────────────────────────────────────────────────────────────
+// ── Customer Modal ─────────────────────────────────────────────────────────────
 
 function CustomerModal({
   customer, onClose, onSaved,
@@ -46,105 +82,107 @@ function CustomerModal({
   onClose: () => void
   onSaved: (c: Customer) => void
 }) {
-  const [form, setForm] = useState(customer ? {
-    name: customer.name,
-    email: customer.email ?? '',
-    phone: customer.phone ?? '',
-    address: customer.address ?? '',
-  } : emptyForm())
+  const [form, setForm] = useState<CustomerFormState>(
+    customer
+      ? { name: customer.name, email: customer.email ?? '', phone: customer.phone ?? '', address: customer.address ?? '' }
+      : emptyForm()
+  )
+  const [tierOverride, setTierOverride] = useState<string>(
+    (customer?.metadata?.loyalty_override as string | undefined) ?? ''
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  function set(key: string, val: string) { setForm(f => ({ ...f, [key]: val })) }
+  function setField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
 
   async function handleSave() {
     if (!form.name.trim()) { setError('El nombre es requerido'); return }
     setSaving(true); setError('')
     try {
-      const url = customer ? `/api/customers/${customer.id}` : '/api/customers'
-      const method = customer ? 'PATCH' : 'POST'
-      const res = await fetch(url, {
-        method,
+      const isEdit = Boolean(customer)
+      const body: Record<string, unknown> = { ...form }
+      if (isEdit) body.loyalty_override = tierOverride || null
+      const res = await fetch(isEdit ? `/api/customers/${customer!.id}` : '/api/customers', {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error al guardar')
+        const data = await res.json().catch(() => ({ error: 'Error al guardar cliente' }))
+        throw new Error(data.error || 'Error al guardar cliente')
       }
-      const saved = await res.json()
-      onSaved(saved)
+      onSaved(await res.json())
     } catch (e: unknown) {
-      setError((e as Error).message)
+      setError((e as Error).message || 'Error al guardar cliente')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="admin-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="admin-modal">
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">
-            {customer ? 'Editar Cliente' : 'Nuevo Cliente'}
-          </span>
-          <button className="admin-btn-icon" onClick={onClose}><X size={16} /></button>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">{customer ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar"
+            className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="admin-modal-body">
-          {error && (
-            <div style={{ background: 'var(--a-red-dim)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: 'var(--a-radius-sm)', padding: '8px 12px', marginBottom: 14, color: 'var(--a-red)', fontSize: 13 }}>
-              {error}
+        <div className="space-y-4 px-5 py-4">
+          {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1.5 md:col-span-2">
+              <label htmlFor="customer_name" className="text-xs font-medium uppercase tracking-wide text-slate-500">Nombre *</label>
+              <input id="customer_name" name="customer_name" value={form.name} onChange={(e) => setField('name', e.target.value)}
+                autoFocus autoComplete="name" placeholder="Nombre del cliente…"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
             </div>
-          )}
-
-          <div className="admin-form-grid cols-2">
-            <div className="admin-form-field" style={{ gridColumn: 'span 2' }}>
-              <label className="admin-label">Nombre *</label>
-              <input
-                className="admin-input"
-                value={form.name}
-                onChange={e => set('name', e.target.value)}
-                placeholder="Nombre del cliente"
-                autoFocus
-              />
+            <div className="space-y-1.5">
+              <label htmlFor="customer_email" className="text-xs font-medium uppercase tracking-wide text-slate-500">Email</label>
+              <input id="customer_email" name="customer_email" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)}
+                autoComplete="email" placeholder="cliente@email.com"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
             </div>
-            <div className="admin-form-field">
-              <label className="admin-label">Email</label>
-              <input
-                type="email"
-                className="admin-input"
-                value={form.email}
-                onChange={e => set('email', e.target.value)}
-                placeholder="cliente@email.com"
-              />
+            <div className="space-y-1.5">
+              <label htmlFor="customer_phone" className="text-xs font-medium uppercase tracking-wide text-slate-500">Teléfono</label>
+              <input id="customer_phone" name="customer_phone" value={form.phone} onChange={(e) => setField('phone', e.target.value)}
+                autoComplete="tel" placeholder="+56 9 1234 5678"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
             </div>
-            <div className="admin-form-field">
-              <label className="admin-label">Teléfono</label>
-              <input
-                className="admin-input"
-                value={form.phone}
-                onChange={e => set('phone', e.target.value)}
-                placeholder="+56 9 1234 5678"
-              />
+            <div className="space-y-1.5 md:col-span-2">
+              <label htmlFor="customer_address" className="text-xs font-medium uppercase tracking-wide text-slate-500">Dirección</label>
+              <input id="customer_address" name="customer_address" value={form.address} onChange={(e) => setField('address', e.target.value)}
+                autoComplete="street-address" placeholder="Dirección del cliente…"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
             </div>
-            <div className="admin-form-field" style={{ gridColumn: 'span 2' }}>
-              <label className="admin-label">Dirección</label>
-              <input
-                className="admin-input"
-                value={form.address}
-                onChange={e => set('address', e.target.value)}
-                placeholder="Dirección del cliente"
-              />
-            </div>
+            {customer && (
+              <div className="space-y-1.5 md:col-span-2">
+                <label htmlFor="loyalty_override" className="text-xs font-medium uppercase tracking-wide text-slate-500">Tier manual (override)</label>
+                <select id="loyalty_override" value={tierOverride} onChange={(e) => setTierOverride(e.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200">
+                  <option value="">— Automático —</option>
+                  {DEFAULT_TIERS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <p className="text-[11px] text-slate-400">Forzar tier manualmente. Útil para asignar Black a clientes VIP.</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <span className="admin-spinner" /> : <CheckCircle2 size={14} />}
-            {customer ? 'Guardar cambios' : 'Crear cliente'}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <button type="button" onClick={onClose}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
+            Cancelar
+          </button>
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 disabled:opacity-60">
+            <CheckCircle2 size={14} className={saving ? 'animate-pulse' : ''} />
+            {customer ? 'Guardar Cambios' : 'Crear Cliente'}
           </button>
         </div>
       </div>
@@ -152,39 +190,18 @@ function CustomerModal({
   )
 }
 
-// ─── Confirm delete ───────────────────────────────────────────────────────────
+// ── Tier badge ─────────────────────────────────────────────────────────────────
 
-function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: () => void; onClose: () => void }) {
-  const [loading, setLoading] = useState(false)
+function TierBadge({ tierId, tierName }: { tierId: string; tierName: string }) {
+  const style = getTierStyle(tierId)
   return (
-    <div className="admin-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="admin-modal" style={{ maxWidth: 380 }}>
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">Eliminar cliente</span>
-          <button className="admin-btn-icon" onClick={onClose}><X size={16} /></button>
-        </div>
-        <div className="admin-modal-body">
-          <p style={{ color: 'var(--a-text-2)', fontSize: 14 }}>
-            ¿Eliminar a <strong style={{ color: 'var(--a-text-1)' }}>{name}</strong>? Esta acción no se puede deshacer.
-          </p>
-        </div>
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button
-            className="admin-btn admin-btn-danger"
-            disabled={loading}
-            onClick={async () => { setLoading(true); await onConfirm(); setLoading(false) }}
-          >
-            {loading ? <span className="admin-spinner" /> : <Trash2 size={14} />}
-            Eliminar
-          </button>
-        </div>
-      </div>
-    </div>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide uppercase ${style.badge}`}>
+      {tierName}
+    </span>
   )
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -193,17 +210,25 @@ export default function ClientesPage() {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
-  const [deleting, setDeleting] = useState<Customer | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { fetchCustomers() }, [])
 
-  async function fetchCustomers(q?: string) {
+  function toast(type: Toast['type'], msg: string) {
+    const id = Date.now()
+    setToasts((prev) => [...prev, { id, type, msg }])
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500)
+  }
+
+  async function fetchCustomers(query?: string) {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (q) params.set('search', q)
-      const res = await fetch(`/api/customers?${params}`)
+      const params = new URLSearchParams({ with_stats: 'true' })
+      if (query?.trim()) params.set('search', query.trim())
+      const res = await fetch(`/api/customers?${params.toString()}`)
       const data = await res.json()
       setCustomers(data.customers ?? [])
       setTotal(data.total ?? 0)
@@ -214,155 +239,191 @@ export default function ClientesPage() {
     }
   }
 
-  function toast(type: Toast['type'], msg: string) {
-    const id = Date.now()
-    setToasts(t => [...t, { id, type, msg }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4500)
+  function handleSearch(value: string) {
+    setSearch(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => fetchCustomers(value), 350)
   }
 
-  function handleSaved(c: Customer) {
-    setCustomers(prev => {
-      const idx = prev.findIndex(x => x.id === c.id)
-      if (idx >= 0) { const next = [...prev]; next[idx] = c; return next }
-      return [c, ...prev]
-    })
-    setTotal(t => editing ? t : t + 1)
-    toast('success', editing ? 'Cliente actualizado' : 'Cliente creado')
+  function handleSaved(customer: Customer) {
     setShowModal(false)
     setEditing(null)
+    toast('success', editing ? 'Cliente actualizado' : 'Cliente creado')
+    fetchCustomers(search || undefined)
   }
 
-  async function handleDelete() {
-    if (!deleting) return
-    try {
-      const res = await fetch(`/api/customers/${deleting.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
-      setCustomers(prev => prev.filter(c => c.id !== deleting.id))
-      setTotal(t => t - 1)
-      toast('success', `"${deleting.name}" eliminado`)
-    } catch {
-      toast('error', 'Error al eliminar cliente')
-    } finally {
-      setDeleting(null)
+  const emptyStateText = useMemo(() => `Sin clientes${search ? ' que coincidan' : ''}`, [search])
+
+  useEffect(() => {
+    const validIds = new Set(customers.map((c) => c.id))
+    setSelectedIds((prev) => prev.filter((id) => validIds.has(id)))
+    if (lastSelectedId && !validIds.has(lastSelectedId)) setLastSelectedId(null)
+  }, [customers, lastSelectedId])
+
+  const selectedCount = selectedIds.length
+
+  function openEdit(customer: Customer) { setEditing(customer); setShowModal(true) }
+  function clearSelection() { setSelectedIds([]); setLastSelectedId(null) }
+
+  function handleRowClick(e: ReactMouseEvent<HTMLTableRowElement>, row: Customer, rowIndex: number) {
+    const withModifiers = e.metaKey || e.ctrlKey || e.shiftKey
+    if (!withModifiers) { openEdit(row); return }
+    e.preventDefault(); e.stopPropagation()
+    if (e.shiftKey && lastSelectedId) {
+      const anchorIndex = customers.findIndex((c) => c.id === lastSelectedId)
+      if (anchorIndex >= 0) {
+        const [start, end] = [anchorIndex, rowIndex].sort((a, b) => a - b)
+        setSelectedIds((prev) => Array.from(new Set([...prev, ...customers.slice(start, end + 1).map((c) => c.id)])))
+        setLastSelectedId(row.id); return
+      }
     }
+    setSelectedIds((prev) => prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id])
+    setLastSelectedId(row.id)
   }
 
-  // Búsqueda con debounce simple
-  let searchTimer: ReturnType<typeof setTimeout>
-  function handleSearch(val: string) {
-    setSearch(val)
-    clearTimeout(searchTimer)
-    searchTimer = setTimeout(() => fetchCustomers(val), 350)
+  async function handleBulkDelete() {
+    if (selectedCount === 0) return
+    if (!window.confirm(`¿Eliminar ${selectedCount} cliente(s)?\n\nEsta acción no se puede deshacer.`)) return
+    const deletedIds: string[] = []
+    let failCount = 0
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+        if (res.ok) deletedIds.push(id)
+        else failCount++
+      } catch { failCount++ }
+    }
+    if (deletedIds.length > 0) {
+      setCustomers((prev) => prev.filter((c) => !deletedIds.includes(c.id)))
+      setTotal((prev) => Math.max(prev - deletedIds.length, 0))
+    }
+    clearSelection()
+    if (deletedIds.length > 0) toast('success', `${deletedIds.length} cliente(s) eliminado(s)`)
+    if (failCount > 0) toast('error', `${failCount} cliente(s) no se pudieron eliminar`)
   }
+
+  // Tier distribution stats
+  const tierCounts = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const c of customers) {
+      const id = c.tier_id ?? 'MEMBER'
+      map[id] = (map[id] ?? 0) + 1
+    }
+    return map
+  }, [customers])
 
   return (
-    <>
-      {/* Header */}
-      <div className="admin-page-header">
+    <section className="space-y-5">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="admin-page-title">Gestión de <span>Clientes</span></h1>
-          <p className="admin-page-subtitle">{total} cliente{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 [text-wrap:balance]">
+            <span className="text-fuchsia-600">Clientes</span>
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {total} cliente{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''} · Haz click en una fila para editar
+          </p>
         </div>
         <button
-          className="admin-btn admin-btn-primary admin-btn-lg"
+          type="button"
           onClick={() => { setEditing(null); setShowModal(true) }}
+          className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2"
         >
-          <Plus size={16} /> Nuevo Cliente
+          <Plus size={16} />
+          Nuevo Cliente
         </button>
-      </div>
+      </header>
 
-      {/* Panel */}
-      <div className="admin-panel">
-        <div className="admin-panel-header">
-          <span className="admin-panel-title">Listado</span>
-          <div style={{ position: 'relative' }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--a-text-3)' }} />
+      {/* Tier distribution */}
+      {!loading && total > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {DEFAULT_TIERS.map((tier) => {
+            const count = tierCounts[tier.id] ?? 0
+            const style = getTierStyle(tier.id)
+            return (
+              <div key={tier.id} className={`rounded-xl border-2 px-3 py-2.5 ${style.panel} ${style.border}`}>
+                <p className={`text-[10px] font-black uppercase tracking-widest ${tier.id === 'BLACK' ? 'text-yellow-400' : 'text-slate-500'}`}>
+                  {tier.id}
+                </p>
+                <p className={`mt-0.5 text-2xl font-black tabular-nums ${tier.id === 'BLACK' ? 'text-white' : 'text-slate-900'}`}>
+                  {count}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">Listado</h2>
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              className="admin-input admin-input-sm"
-              style={{ paddingLeft: 30, width: 240 }}
-              placeholder="Buscar por nombre, email o teléfono…"
               value={search}
-              onChange={e => handleSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar por nombre, email o teléfono…"
+              className="h-9 w-full min-w-[240px] rounded-md border border-slate-300 pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
             />
           </div>
         </div>
 
         {loading ? (
-          <div style={{ padding: 48, display: 'flex', justifyContent: 'center' }}>
-            <span className="admin-spinner" />
-          </div>
+          <div className="flex items-center justify-center px-4 py-14 text-sm text-slate-500">Cargando…</div>
         ) : customers.length === 0 ? (
-          <div className="admin-empty">
-            <UserCircle2 size={36} className="admin-empty-icon" />
-            <p className="admin-empty-text">Sin clientes{search ? ' que coincidan' : ''}</p>
+          <div className="px-4 py-14 text-center text-slate-500">
+            <UserCircle2 size={34} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">{emptyStateText}</p>
             {!search && (
-              <button
-                className="admin-btn admin-btn-primary"
-                style={{ marginTop: 12 }}
-                onClick={() => setShowModal(true)}
-              >
-                <Plus size={14} /> Agregar primer cliente
+              <button type="button" onClick={() => { setEditing(null); setShowModal(true) }}
+                className="mt-3 inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2">
+                <Plus size={14} />
+                Agregar Primer Cliente
               </button>
             )}
           </div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Teléfono</th>
-                  <th>Dirección</th>
-                  <th>Registrado</th>
-                  <th style={{ width: 80, textAlign: 'right' }}>Acciones</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nivel</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Compras</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Email</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Teléfono</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Registrado</th>
                 </tr>
               </thead>
-              <tbody>
-                {customers.map(c => (
-                  <tr key={c.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: '50%',
-                          background: 'var(--a-surface-2)',
-                          border: '1px solid var(--a-border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 11, fontWeight: 600, color: 'var(--a-text-2)',
-                          flexShrink: 0,
-                        }}>
-                          {c.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+              <tbody className="divide-y divide-slate-100">
+                {customers.map((c, rowIndex) => (
+                  <tr
+                    key={c.id}
+                    className={`cursor-pointer transition hover:bg-slate-50 ${selectedIds.includes(c.id) ? 'bg-fuchsia-50' : ''}`}
+                    onClick={(e) => handleRowClick(e, c, rowIndex)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-200 bg-slate-100 text-[11px] font-semibold text-slate-600">
+                          {c.name.split(' ').filter(Boolean).map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
                         </div>
-                        <span style={{ fontWeight: 500 }}>{c.name}</span>
+                        <span className="font-medium text-slate-900">{c.name}</span>
                       </div>
                     </td>
-                    <td>
+                    <td className="px-4 py-3">
+                      {c.tier_id
+                        ? <TierBadge tierId={c.tier_id} tierName={c.tier_name ?? c.tier_id} />
+                        : <span className="text-slate-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-slate-600">{c.total_orders ?? 0}</td>
+                    <td className="px-4 py-3">
                       {c.email
-                        ? <a href={`mailto:${c.email}`} style={{ color: 'var(--a-cyan)', textDecoration: 'none', fontSize: 12, fontFamily: 'var(--a-font-mono)' }}>{c.email}</a>
-                        : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
+                        ? <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-sky-700 hover:underline">{c.email}</a>
+                        : <span className="text-slate-400">—</span>}
                     </td>
-                    <td className="admin-mono">{c.phone ?? '—'}</td>
-                    <td style={{ color: 'var(--a-text-2)', fontSize: 12 }}>{c.address ?? '—'}</td>
-                    <td style={{ fontSize: 12, color: 'var(--a-text-3)' }}>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.phone ?? '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(c.created_at).toLocaleDateString('es-CL')}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                        <button
-                          className="admin-btn-icon"
-                          title="Editar"
-                          onClick={() => { setEditing(c); setShowModal(true) }}
-                        >
-                          <Pencil size={13} />
-                        </button>
-                        <button
-                          className="admin-btn-icon danger"
-                          title="Eliminar"
-                          onClick={() => setDeleting(c)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}
@@ -372,7 +433,21 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Modals */}
+      {/* Bulk action bar */}
+      {selectedCount > 0 && (
+        <div className="fixed bottom-5 left-1/2 z-[450] flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-xl">
+          <span className="text-xs font-semibold text-slate-700">{selectedCount} seleccionada{selectedCount !== 1 ? 's' : ''}</span>
+          <button onClick={clearSelection}
+            className="inline-flex h-7 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50">
+            Limpiar
+          </button>
+          <button onClick={handleBulkDelete}
+            className="inline-flex h-7 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700">
+            Eliminar
+          </button>
+        </div>
+      )}
+
       {showModal && (
         <CustomerModal
           customer={editing}
@@ -381,15 +456,7 @@ export default function ClientesPage() {
         />
       )}
 
-      {deleting && (
-        <ConfirmModal
-          name={deleting.name}
-          onConfirm={handleDelete}
-          onClose={() => setDeleting(null)}
-        />
-      )}
-
-      <Toasts toasts={toasts} onRemove={id => setToasts(t => t.filter(x => x.id !== id))} />
-    </>
+      <Toasts toasts={toasts} onRemove={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
+    </section>
   )
 }

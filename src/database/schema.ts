@@ -70,6 +70,43 @@ export interface OrderItems {
   unit_price: Numeric;
 }
 
+export interface Locations {
+  id: Generated<string>;
+  tenant_id: string | null;
+  name: string;
+  type: Generated<string>;       // STORE | WAREHOUSE | ONLINE
+  is_default: Generated<boolean>;
+  active: Generated<boolean>;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  hours: string | null;
+  created_at: Generated<Timestamp | null>;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface PosSessions {
+  id: Generated<string>;
+  tenant_id: string | null;
+  location_id: string | null;
+  user_id: string | null;
+  status: Generated<string>;     // OPEN | CLOSED | FORCE_CLOSED
+  opening_amount: Generated<Numeric>;
+  closing_amount: Numeric | null;
+  closing_notes: string | null;
+  total_sales: Numeric | null;
+  total_cash: Numeric | null;
+  total_card: Numeric | null;
+  total_transfer: Numeric | null;
+  total_cancelled: Numeric | null;
+  force_closed_by: string | null;
+  force_closed_note: string | null;
+  opened_at: Generated<Timestamp>;
+  closed_at: Timestamp | null;
+  created_at: Generated<Timestamp | null>;
+}
+
 export interface Orders {
   channel: Generated<string | null>;
   completed_at: Timestamp | null;
@@ -77,10 +114,12 @@ export interface Orders {
   customer_id: string | null;
   discount: Generated<Numeric | null>;
   id: Generated<string>;
+  location_id: string | null;
   metadata: Generated<Json | null>;
   order_number: string;
   payment_method: string | null;
   payment_status: Generated<string | null>;
+  pos_session_id: string | null;
   status: Generated<string | null>;
   subtotal: Numeric;
   tax: Generated<Numeric | null>;
@@ -142,6 +181,7 @@ export interface StockMovements {
   created_at: Generated<Timestamp | null>;
   created_by: string | null;
   id: Generated<string>;
+  location_id: string | null;
   new_stock: number;
   notes: string | null;
   previous_stock: number;
@@ -183,6 +223,7 @@ export interface Users {
   created_at: Generated<Timestamp | null>;
   email: string;
   id: Generated<string>;
+  metadata: Generated<Json | null>;
   name: string;
   password_hash: string;
   role: Generated<string | null>;
@@ -278,7 +319,18 @@ export interface ProductPriceHistory {
   created_at: Generated<Timestamp | null>;
 }
 
+export interface Superadmins {
+  id: Generated<string>;
+  email: string;
+  password_hash: string;
+  name: string;
+  created_at: Generated<Timestamp | null>;
+}
+
 export interface DB {
+  locations: Locations;
+  pos_sessions: PosSessions;
+  superadmins: Superadmins;
   brands: Brands;
   categories: Categories;
   customers: Customers;

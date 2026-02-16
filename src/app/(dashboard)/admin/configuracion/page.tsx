@@ -1,19 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import currency from 'currency.js'
 import {
-  Store,
-  Globe,
-  DollarSign,
-  Clock,
-  CheckCircle2,
   AlertCircle,
-  Save,
+  CheckCircle2,
+  DollarSign,
+  Globe,
   RefreshCw,
+  Save,
+  Store,
+  ShoppingCart,
 } from 'lucide-react'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CurrencyFormat {
   country: string
@@ -29,9 +27,8 @@ interface Settings {
   currency: string
   timezone: string
   currency_format: CurrencyFormat
+  print_ticket: boolean
 }
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const COUNTRIES = [
   { code: 'CL', name: 'Chile' },
@@ -91,13 +88,12 @@ const TIMEZONES = [
   { value: 'UTC', label: 'UTC (GMT+0)' },
 ]
 
-// ─── Defaults ─────────────────────────────────────────────────────────────────
-
 const DEFAULT_SETTINGS: Settings = {
   store_name: '',
   language: 'es',
   currency: 'CLP',
   timezone: 'America/Santiago',
+  print_ticket: false,
   currency_format: {
     country: 'CL',
     currency_symbol: '$',
@@ -107,100 +103,96 @@ const DEFAULT_SETTINGS: Settings = {
   },
 }
 
-// ─── Preview ──────────────────────────────────────────────────────────────────
-
-function CurrencyPreview({ fmt }: { fmt: CurrencyFormat }) {
-  const samples = [1234567.89, 9999, 0.5, 1000000]
-
-  function format(val: number) {
-    return currency(val, {
-      symbol: fmt.currency_symbol,
-      separator: fmt.thousand_separator,
-      decimal: fmt.decimal_separator,
-      precision: fmt.decimal_places,
-    }).format()
-  }
-
+function Field({
+  id,
+  label,
+  children,
+}: {
+  id: string
+  label: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="admin-card" style={{ padding: '16px 20px' }}>
-      <div style={{ fontSize: 11, fontFamily: 'var(--a-font-mono)', color: 'var(--a-text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        Vista previa
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {samples.map((v) => (
-          <span
-            key={v}
-            style={{
-              fontFamily: 'var(--a-font-mono)',
-              fontSize: 15,
-              fontWeight: 600,
-              color: 'var(--a-accent)',
-              background: 'var(--a-accent-dim)',
-              border: '1px solid var(--a-border-accent)',
-              borderRadius: 'var(--a-radius-sm)',
-              padding: '3px 10px',
-            }}
-          >
-            {format(v)}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Field ────────────────────────────────────────────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label className="admin-label">{label}</label>
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </label>
       {children}
     </div>
   )
 }
 
 function Select({
-  value, onChange, options,
+  id,
+  value,
+  onChange,
+  options,
 }: {
+  id: string
   value: string
-  onChange: (v: string) => void
+  onChange: (value: string) => void
   options: { value: string; label: string }[]
 }) {
   return (
     <select
-      className="admin-input"
+      id={id}
+      name={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
       ))}
     </select>
   )
 }
 
-// ─── Section header ───────────────────────────────────────────────────────────
-
-function Section({ icon: Icon, title, children }: {
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
   icon: React.ElementType
   title: string
   children: React.ReactNode
 }) {
   return (
-    <div className="admin-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 14, borderBottom: '1px solid var(--a-border)' }}>
-        <Icon size={15} color="var(--a-accent)" />
-        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--a-text-1)' }}>{title}</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-        {children}
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <header className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
+        <Icon size={16} className="text-fuchsia-600" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+      </header>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{children}</div>
+    </section>
+  )
+}
+
+function CurrencyPreview({ fmt }: { fmt: CurrencyFormat }) {
+  const samples = [1234567.89, 9999, 0.5, 1000000]
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Vista previa</p>
+      <div className="flex flex-wrap gap-2">
+        {samples.map((val) => (
+          <span
+            key={val}
+            className="rounded-md border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 font-mono text-sm font-semibold text-fuchsia-700"
+          >
+            {currency(val, {
+              symbol: fmt.currency_symbol,
+              separator: fmt.thousand_separator,
+              decimal: fmt.decimal_separator,
+              precision: fmt.decimal_places,
+            }).format()}
+          </span>
+        ))}
       </div>
     </div>
   )
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ConfiguracionPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -219,14 +211,13 @@ export default function ConfiguracionPage() {
       const res = await fetch('/api/settings')
       if (!res.ok) throw new Error()
       const data = await res.json()
-
       const meta = (data.settings?.metadata ?? {}) as Record<string, unknown>
-
       setSettings({
         store_name: data.tenant?.name ?? '',
         language: data.settings?.language ?? 'es',
         currency: data.settings?.currency ?? 'CLP',
         timezone: data.settings?.timezone ?? 'America/Santiago',
+        print_ticket: meta.print_ticket === true,
         currency_format: {
           country: (meta.country as string) ?? 'CL',
           currency_symbol: (meta.currency_symbol as string) ?? '$',
@@ -242,16 +233,14 @@ export default function ConfiguracionPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   function setFmt(key: keyof CurrencyFormat, val: string | number) {
-    setSettings((s) => ({
-      ...s,
-      currency_format: { ...s.currency_format, [key]: val },
-    }))
+    setSettings((s) => ({ ...s, currency_format: { ...s.currency_format, [key]: val } }))
   }
 
-  // Auto-fill symbol when currency changes
   function handleCurrencyChange(code: string) {
     const found = CURRENCIES.find((c) => c.code === code)
     setSettings((s) => ({
@@ -275,6 +264,7 @@ export default function ConfiguracionPage() {
           language: settings.language,
           currency: settings.currency,
           timezone: settings.timezone,
+          print_ticket: settings.print_ticket,
           country: settings.currency_format.country,
           currency_symbol: settings.currency_format.currency_symbol,
           decimal_separator: settings.currency_format.decimal_separator,
@@ -292,53 +282,71 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header */}
-      <div className="admin-page-header">
+    <section className="space-y-5">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="admin-page-title">Configuración</h1>
-          <p className="admin-page-subtitle">Personaliza tu tienda: nombre, región, moneda y formato</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 [text-wrap:balance]">Configuración</h1>
+          <p className="mt-1 text-sm text-slate-500">Personaliza tu tienda: nombre, región, moneda y formato</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="admin-btn admin-btn-ghost admin-btn-sm" onClick={load} disabled={loading}>
-            <RefreshCw size={13} />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Recargar
           </button>
-          <button className="admin-btn admin-btn-primary admin-btn-sm" onClick={handleSave} disabled={saving || loading}>
-            {saving ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 disabled:opacity-50"
+          >
+            {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? 'Guardando…' : 'Guardar Cambios'}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Toast */}
       {toast && (
-        <div className={`admin-toast ${toast.type}`} style={{ alignSelf: 'flex-start' }}>
-          <span className={`admin-toast-icon ${toast.type}`}>
-            {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
-          </span>
-          <span className="admin-toast-msg">{toast.msg}</span>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+            toast.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+          {toast.msg}
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--a-text-3)', fontSize: 13 }}>
-          Cargando…
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">
+          <RefreshCw size={16} className="mx-auto mb-2 animate-spin" />
+          Cargando configuración…
         </div>
       ) : (
         <>
-          {/* Tienda */}
           <Section icon={Store} title="Tienda">
-            <Field label="Nombre de la tienda">
+            <Field id="store_name" label="Nombre de la tienda">
               <input
-                className="admin-input"
+                id="store_name"
+                name="store_name"
                 value={settings.store_name}
                 onChange={(e) => setSettings((s) => ({ ...s, store_name: e.target.value }))}
-                placeholder="Mi Tienda"
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+                placeholder="Ej: Mi Tienda…"
+                autoComplete="off"
               />
             </Field>
-            <Field label="País">
+            <Field id="country" label="País">
               <Select
+                id="country"
                 value={settings.currency_format.country}
                 onChange={(v) => setFmt('country', v)}
                 options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
@@ -346,17 +354,18 @@ export default function ConfiguracionPage() {
             </Field>
           </Section>
 
-          {/* Regional */}
           <Section icon={Globe} title="Idioma y región">
-            <Field label="Idioma">
+            <Field id="language" label="Idioma">
               <Select
+                id="language"
                 value={settings.language}
                 onChange={(v) => setSettings((s) => ({ ...s, language: v }))}
                 options={LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
               />
             </Field>
-            <Field label="Zona horaria">
+            <Field id="timezone" label="Zona horaria">
               <Select
+                id="timezone"
                 value={settings.timezone}
                 onChange={(v) => setSettings((s) => ({ ...s, timezone: v }))}
                 options={TIMEZONES.map((t) => ({ value: t.value, label: t.label }))}
@@ -364,68 +373,93 @@ export default function ConfiguracionPage() {
             </Field>
           </Section>
 
-          {/* Moneda */}
+          <Section icon={ShoppingCart} title="Punto de Venta (POS)">
+            <div className="md:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Imprimir ticket al finalizar venta</p>
+                <p className="mt-0.5 text-xs text-slate-500">Muestra el botón "Imprimir" en la pantalla de confirmación</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.print_ticket}
+                onClick={() => setSettings((s) => ({ ...s, print_ticket: !s.print_ticket }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500 focus-visible:ring-offset-2 ${
+                  settings.print_ticket ? 'bg-fuchsia-600' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    settings.print_ticket ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </Section>
+
           <Section icon={DollarSign} title="Moneda">
-            <Field label="Moneda">
+            <Field id="currency" label="Moneda">
               <Select
+                id="currency"
                 value={settings.currency}
                 onChange={handleCurrencyChange}
                 options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} — ${c.name}` }))}
               />
             </Field>
-            <Field label="Símbolo">
+            <Field id="currency_symbol" label="Símbolo">
               <input
-                className="admin-input"
+                id="currency_symbol"
+                name="currency_symbol"
                 value={settings.currency_format.currency_symbol}
                 onChange={(e) => setFmt('currency_symbol', e.target.value)}
-                placeholder="$"
-                maxLength={6}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+                placeholder="$…"
+                autoComplete="off"
               />
             </Field>
-          </Section>
-
-          {/* Formato */}
-          <Section icon={Clock} title="Formato de moneda">
-            <Field label="Separador decimal">
+            <Field id="decimal_separator" label="Separador decimal">
               <Select
+                id="decimal_separator"
                 value={settings.currency_format.decimal_separator}
-                onChange={(v) => setFmt('decimal_separator', v)}
+                onChange={(v) => setFmt('decimal_separator', v as '.' | ',')}
                 options={[
-                  { value: '.', label: 'Punto  ( 1234.56 )' },
-                  { value: ',', label: 'Coma   ( 1234,56 )' },
+                  { value: ',', label: 'Coma (,)' },
+                  { value: '.', label: 'Punto (.)' },
                 ]}
               />
             </Field>
-            <Field label="Separador de miles">
+            <Field id="thousand_separator" label="Separador de miles">
               <Select
+                id="thousand_separator"
                 value={settings.currency_format.thousand_separator}
-                onChange={(v) => setFmt('thousand_separator', v)}
+                onChange={(v) => setFmt('thousand_separator', v as '.' | ',' | ' ')}
                 options={[
-                  { value: ',', label: 'Coma   ( 1,234,567 )' },
-                  { value: '.', label: 'Punto  ( 1.234.567 )' },
-                  { value: ' ', label: 'Espacio ( 1 234 567 )' },
+                  { value: '.', label: 'Punto (.)' },
+                  { value: ',', label: 'Coma (,)' },
+                  { value: ' ', label: 'Espacio' },
                 ]}
               />
             </Field>
-            <Field label="Decimales">
+            <Field id="decimal_places" label="Cantidad de decimales">
               <Select
+                id="decimal_places"
                 value={String(settings.currency_format.decimal_places)}
-                onChange={(v) => setFmt('decimal_places', parseInt(v, 10))}
+                onChange={(v) => setFmt('decimal_places', Number(v))}
                 options={[
-                  { value: '0', label: '0  — Sin decimales' },
-                  { value: '1', label: '1  — Un decimal' },
-                  { value: '2', label: '2  — Dos decimales' },
-                  { value: '3', label: '3  — Tres decimales' },
-                  { value: '4', label: '4  — Cuatro decimales' },
+                  { value: '0', label: '0' },
+                  { value: '1', label: '1' },
+                  { value: '2', label: '2' },
+                  { value: '3', label: '3' },
                 ]}
               />
             </Field>
+            <div className="md:col-span-2">
+              <CurrencyPreview fmt={settings.currency_format} />
+            </div>
           </Section>
-
-          {/* Preview */}
-          <CurrencyPreview fmt={settings.currency_format} />
         </>
       )}
-    </div>
+    </section>
   )
 }

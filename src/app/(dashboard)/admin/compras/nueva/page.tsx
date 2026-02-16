@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   type CurrencyFormatConfig,
@@ -10,45 +10,42 @@ import {
   parseMoneyInput,
   resolveCurrencyFormat,
 } from '@/lib/currency-format'
-import {
-  Plus, Trash2, ChevronDown, Upload, X, CheckCircle2,
-  AlertCircle, Info,
-} from 'lucide-react'
+import { AlertCircle, CheckCircle2, ChevronDown, Info, Plus, Trash2, Upload, X } from 'lucide-react'
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+interface Supplier {
+  id: string
+  name: string
+  rut: string | null
+  contact_name: string | null
+}
 
-interface Supplier { id: string; name: string; rut: string | null; contact_name: string | null }
-interface Category  { id: string; name: string }
 interface ProductHit {
-  id: string; name: string; sku: string; barcode: string | null
-  base_price: string; stock: number; category_id: string | null
+  id: string
+  name: string
+  sku: string
+  barcode: string | null
+  base_price: string
+  stock: number
 }
 
 interface PurchaseRow {
   rowId: string
-  // search
   query: string
   results: ProductHit[]
   showDropdown: boolean
   searching: boolean
-  // producto seleccionado
   productId: string | null
   productName: string
-  salePrice: number
   currentStock: number
   isExisting: boolean
-  // nuevo producto inline
   isNew: boolean
   newSku: string
   newCategoryId: string
   newBasePrice: string
-  // campos compra
   qty: number
   purchasePriceGross: string
   purchasePriceNet: string
 }
-
-interface Toast { id: number; type: 'success' | 'error' | 'info'; msg: string }
 
 interface ExtraChargeRow {
   id: string
@@ -57,18 +54,33 @@ interface ExtraChargeRow {
   amountNet: string
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-const uid = () => Math.random().toString(36).slice(2, 9)
+interface Toast {
+  id: number
+  type: 'success' | 'error' | 'info'
+  msg: string
+}
 
 const IVA_RATE = 0.19
+const uid = () => Math.random().toString(36).slice(2, 9)
 
 function emptyRow(): PurchaseRow {
   return {
-    rowId: uid(), query: '', results: [], showDropdown: false, searching: false,
-    productId: null, productName: '', salePrice: 0, currentStock: 0, isExisting: false,
-    isNew: false, newSku: '', newCategoryId: '', newBasePrice: '',
-    qty: 1, purchasePriceGross: '', purchasePriceNet: '',
+    rowId: uid(),
+    query: '',
+    results: [],
+    showDropdown: false,
+    searching: false,
+    productId: null,
+    productName: '',
+    currentStock: 0,
+    isExisting: false,
+    isNew: false,
+    newSku: '',
+    newCategoryId: '',
+    newBasePrice: '',
+    qty: 1,
+    purchasePriceGross: '',
+    purchasePriceNet: '',
   }
 }
 
@@ -76,21 +88,63 @@ function emptyExtraCharge(): ExtraChargeRow {
   return { id: uid(), description: '', amountGross: '', amountNet: '' }
 }
 
-// ─── Toast component ───────────────────────────────────────────────────────
-
-function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+function MoneyInput({
+  value,
+  onChange,
+  placeholder = '0',
+  className = '',
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  className?: string
+}) {
   return (
-    <div className="admin-toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className={`admin-toast ${t.type}`}>
-          <span className={`admin-toast-icon ${t.type}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} />
-              : t.type === 'error' ? <AlertCircle size={15} />
-              : <Info size={15} />}
-          </span>
-          <span className="admin-toast-msg">{t.msg}</span>
-          <button className="admin-btn-icon" style={{ marginLeft: 'auto' }} onClick={() => onRemove(t.id)}>
-            <X size={13} />
+    <div className={`relative ${className}`}>
+      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-slate-500">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-9 w-full rounded-md border border-slate-300 bg-white pl-6 pr-2 text-right font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+      />
+    </div>
+  )
+}
+
+function Toasts({
+  toasts,
+  onRemove,
+}: {
+  toasts: Toast[]
+  onRemove: (id: number) => void
+}) {
+  return (
+    <div className="fixed right-4 top-4 z-[90] space-y-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          role="status"
+          aria-live="polite"
+          className={`flex min-w-[280px] items-center gap-2 rounded-md border px-3 py-2 text-sm shadow-sm ${
+            t.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : t.type === 'error'
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : 'border-sky-200 bg-sky-50 text-sky-700'
+          }`}
+        >
+          {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : <Info size={15} />}
+          <span className="flex-1">{t.msg}</span>
+          <button
+            type="button"
+            onClick={() => onRemove(t.id)}
+            className="rounded p-1 transition hover:bg-black/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            aria-label="Cerrar mensaje"
+          >
+            <X size={14} />
           </button>
         </div>
       ))}
@@ -98,15 +152,16 @@ function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) 
   )
 }
 
-// ─── SupplierSelector ─────────────────────────────────────────────────────
-
 function SupplierSelector({
-  suppliers, selected, onSelect, onCreated,
+  suppliers,
+  selected,
+  onSelect,
+  onCreated,
 }: {
   suppliers: Supplier[]
   selected: Supplier | null
-  onSelect: (s: Supplier | null) => void
-  onCreated: (s: Supplier) => void
+  onSelect: (supplier: Supplier | null) => void
+  onCreated: (supplier: Supplier) => void
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -116,14 +171,17 @@ function SupplierSelector({
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filtered = suppliers.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    (s.rut || '').toLowerCase().includes(search.toLowerCase())
+  const filtered = suppliers.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      (s.rut ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   async function handleCreate() {
@@ -142,84 +200,101 @@ function SupplierSelector({
       setNewName('')
       setCreating(false)
       setOpen(false)
-    } catch {
-      // handled upstream
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="supplier-selector-wrap" ref={ref}>
-      <div
-        className={`supplier-selected${open ? ' open' : ''}`}
-        onClick={() => setOpen(!open)}
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-10 w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 text-left text-sm text-slate-900 outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
       >
-        {selected
-          ? <span className="supplier-selected-name">{selected.name}</span>
-          : <span className="supplier-placeholder">Seleccionar proveedor…</span>}
-        <ChevronDown size={14} style={{ color: 'var(--a-text-3)', flexShrink: 0 }} />
-      </div>
+        <span className="truncate">{selected ? selected.name : 'Seleccionar proveedor…'}</span>
+        <ChevronDown size={14} className="text-slate-500" />
+      </button>
 
       {open && (
-        <div className="supplier-dropdown">
-          <div className="supplier-dropdown-search">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-30 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+          <div className="border-b border-slate-200 p-2">
             <input
               autoFocus
-              className="admin-input admin-input-sm"
-              placeholder="Buscar proveedor…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar proveedor…"
+              className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
             />
           </div>
 
-          {creating ? (
-            <div style={{ padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--a-border)' }}>
+          {creating && (
+            <div className="flex items-center gap-2 border-b border-slate-200 p-2">
               <input
                 autoFocus
-                className="admin-input admin-input-sm"
-                placeholder="Nombre del proveedor"
                 value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                style={{ flex: 1 }}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                placeholder="Nombre del proveedor"
+                className="h-9 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
               />
-              <button className="admin-btn admin-btn-primary admin-btn-sm" onClick={handleCreate} disabled={saving || !newName.trim()}>
-                {saving ? <span className="admin-spinner" /> : 'Crear'}
-              </button>
-              <button className="admin-btn-icon" onClick={() => setCreating(false)}><X size={13} /></button>
-            </div>
-          ) : null}
-
-          <div className="supplier-dropdown-list">
-            {selected && (
-              <div className="supplier-dropdown-item" onClick={() => { onSelect(null); setOpen(false) }}>
-                <div className="supplier-dropdown-item-name" style={{ color: 'var(--a-text-3)' }}>Sin proveedor</div>
-              </div>
-            )}
-            {filtered.map(s => (
-              <div
-                key={s.id}
-                className="supplier-dropdown-item"
-                onClick={() => { onSelect(s); setOpen(false); setSearch('') }}
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={saving || !newName.trim()}
+                className="rounded-md bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-fuchsia-700 disabled:opacity-60"
               >
-                <div className="supplier-dropdown-item-name">{s.name}</div>
-                {(s.rut || s.contact_name) && (
-                  <div className="supplier-dropdown-item-meta">
-                    {[s.rut, s.contact_name].filter(Boolean).join(' · ')}
-                  </div>
-                )}
-              </div>
-            ))}
-            {filtered.length === 0 && !creating && (
-              <div style={{ padding: '10px 14px', color: 'var(--a-text-3)', fontSize: 12 }}>Sin resultados</div>
+                {saving ? '…' : 'Crear'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreating(false)}
+                className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-60 overflow-y-auto">
+            {selected && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(null)
+                  setOpen(false)
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-slate-500 transition hover:bg-slate-50"
+              >
+                Sin proveedor
+              </button>
             )}
+            {filtered.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  onSelect(s)
+                  setSearch('')
+                  setOpen(false)
+                }}
+                className="block w-full px-3 py-2 text-left text-sm transition hover:bg-slate-50"
+              >
+                <p className="font-medium text-slate-900">{s.name}</p>
+                {(s.rut || s.contact_name) && <p className="text-xs text-slate-500">{[s.rut, s.contact_name].filter(Boolean).join(' · ')}</p>}
+              </button>
+            ))}
+            {filtered.length === 0 && !creating && <div className="px-3 py-2 text-sm text-slate-500">Sin resultados</div>}
           </div>
 
           {!creating && (
-            <div className="supplier-add-new" onClick={() => setCreating(true)}>
-              <Plus size={13} /> Nuevo proveedor
-            </div>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex w-full items-center gap-1.5 border-t border-slate-200 px-3 py-2 text-sm font-medium text-fuchsia-700 transition hover:bg-fuchsia-50"
+            >
+              <Plus size={14} /> Nuevo proveedor
+            </button>
           )}
         </div>
       )}
@@ -227,13 +302,13 @@ function SupplierSelector({
   )
 }
 
-// ─── ProductRow ────────────────────────────────────────────────────────────
-
 function ProductRow({
-  row, categories, currencyFormat, onChange, onRemove,
+  row,
+  currencyFormat,
+  onChange,
+  onRemove,
 }: {
   row: PurchaseRow
-  categories: Category[]
   currencyFormat: CurrencyFormatConfig
   onChange: (id: string, patch: Partial<PurchaseRow>) => void
   onRemove: (id: string) => void
@@ -241,65 +316,67 @@ function ProductRow({
   const searchTimer = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const dropPortalRef = useRef<HTMLDivElement>(null)
-  const stockDisplay = row.currentStock + row.qty
-  const prevNewStock = useRef(stockDisplay)
   const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
-  // Flash animation when stock changes
-  const stockRef = useRef<HTMLSpanElement>(null)
-  useEffect(() => {
-    if (prevNewStock.current !== stockDisplay && stockRef.current) {
-      stockRef.current.classList.remove('flash')
-      void stockRef.current.offsetWidth
-      stockRef.current.classList.add('flash')
-      prevNewStock.current = stockDisplay
-    }
-  }, [stockDisplay])
-
-  // Posicionar el portal dropdown bajo el input
   useEffect(() => {
     if (row.showDropdown && inputRef.current) {
       const rect = inputRef.current.getBoundingClientRect()
-      setDropPos({ top: rect.bottom + window.scrollY + 3, left: rect.left + window.scrollX, width: rect.width })
+      setDropPos({
+        top: rect.bottom + window.scrollY + 3,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      })
     }
   }, [row.showDropdown])
 
-  // Cerrar dropdown al clickear fuera
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (
-        inputRef.current && !inputRef.current.contains(target) &&
-        dropPortalRef.current && !dropPortalRef.current.contains(target)
+        inputRef.current &&
+        !inputRef.current.contains(target) &&
+        dropPortalRef.current &&
+        !dropPortalRef.current.contains(target)
       ) {
         onChange(row.rowId, { showDropdown: false })
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [row.rowId, onChange])
+  }, [onChange, row.rowId])
 
-  async function handleSearch(q: string) {
-    onChange(row.rowId, { query: q, isNew: false, productId: null, productName: '', salePrice: 0, currentStock: 0, isExisting: false })
-    if (!q.trim()) { onChange(row.rowId, { results: [], showDropdown: false }); return }
+  const hasProduct = row.isExisting || row.isNew
+  const stockDisplay = row.currentStock + row.qty
+
+  async function handleSearch(value: string) {
+    onChange(row.rowId, {
+      query: value,
+      isNew: false,
+      productId: null,
+      productName: '',
+      currentStock: 0,
+      isExisting: false,
+    })
+    if (!value.trim()) {
+      onChange(row.rowId, { results: [], showDropdown: false })
+      return
+    }
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(async () => {
       onChange(row.rowId, { searching: true, showDropdown: true })
       try {
-        const query = q.trim()
-        const res = await fetch(`/api/products?search=${encodeURIComponent(query)}&limit=8&active=true`)
+        const q = value.trim()
+        const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&limit=8&active=true`)
         const data = await res.json()
         const results: ProductHit[] = data.products ?? []
-        const exactBarcodeMatches = results.filter((p) =>
-          String(p.barcode ?? '').trim().toLowerCase() === query.toLowerCase()
+        const exactBarcodeMatches = results.filter(
+          (p) => String(p.barcode ?? '').trim().toLowerCase() === q.toLowerCase()
         )
-
         if (exactBarcodeMatches.length === 1) {
           selectProduct(exactBarcodeMatches[0])
           onChange(row.rowId, { searching: false, showDropdown: false, results: [] })
           return
         }
-
         onChange(row.rowId, { results, searching: false })
       } catch {
         onChange(row.rowId, { searching: false })
@@ -308,12 +385,12 @@ function ProductRow({
   }
 
   function selectProduct(p: ProductHit) {
+    const basePrice = Number(p.base_price)
     onChange(row.rowId, {
       query: p.name,
       productId: p.id,
       productName: p.name,
-      salePrice: parseFloat(p.base_price),
-      newBasePrice: formatMoneyInput(p.base_price, currencyFormat),
+      newBasePrice: formatMoneyInput(Number.isFinite(basePrice) ? basePrice : '', currencyFormat),
       currentStock: p.stock,
       isExisting: true,
       isNew: false,
@@ -336,157 +413,146 @@ function ProductRow({
     })
   }
 
-  const hasProduct = row.isExisting || row.isNew
   function handlePurchaseGrossChange(value: string) {
     const grossInput = formatMoneyInput(value, currencyFormat)
     const gross = parseMoneyInput(grossInput, currencyFormat)
     onChange(row.rowId, {
       purchasePriceGross: grossInput,
-      purchasePriceNet: grossInput.trim() === '' || Number.isNaN(gross)
-        ? ''
-        : formatMoneyInput(Math.round(gross / (1 + IVA_RATE)).toString(), currencyFormat),
+      purchasePriceNet:
+        grossInput.trim() === '' || Number.isNaN(gross)
+          ? ''
+          : formatMoneyInput(Math.round(gross / (1 + IVA_RATE)).toString(), currencyFormat),
     })
   }
+
   function handlePurchaseNetChange(value: string) {
     const netInput = formatMoneyInput(value, currencyFormat)
     const net = parseMoneyInput(netInput, currencyFormat)
     onChange(row.rowId, {
       purchasePriceNet: netInput,
-      purchasePriceGross: netInput.trim() === '' || Number.isNaN(net)
-        ? ''
-        : formatMoneyInput(Math.round(net * (1 + IVA_RATE)).toString(), currencyFormat),
+      purchasePriceGross:
+        netInput.trim() === '' || Number.isNaN(net)
+          ? ''
+          : formatMoneyInput(Math.round(net * (1 + IVA_RATE)).toString(), currencyFormat),
     })
   }
 
   return (
-    <>
-      <div className="purchase-items-row">
-        {/* Búsqueda / nombre */}
-        <div className="product-search-wrap">
-          <input
-            ref={inputRef}
-            className={`admin-input admin-input-sm${row.isNew ? ' mono' : ''}`}
-            placeholder="Nombre, SKU o código de barras…"
-            value={row.query}
-            onChange={e => handleSearch(e.target.value)}
-            onFocus={() => { if (row.results.length > 0) onChange(row.rowId, { showDropdown: true }) }}
-            readOnly={row.isExisting}
-            style={row.isExisting ? { opacity: 0.7, cursor: 'default' } : {}}
-          />
-          {row.isExisting && (
-            <button
-              className="admin-btn-icon"
-              style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
-              title="Cambiar producto"
-              onClick={() => onChange(row.rowId, { isExisting: false, productId: null, productName: '', query: '', currentStock: 0, salePrice: 0 })}
-            >
-              <X size={11} />
-            </button>
-          )}
-        </div>
-
-        {/* Dropdown via portal — se renderiza en body, sobre todo el layout */}
-        {row.showDropdown && dropPos && typeof window !== 'undefined' && createPortal(
-          <div
-            ref={dropPortalRef}
-            className="product-dropdown"
-            style={{ position: 'absolute', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
+    <div className="grid grid-cols-[minmax(220px,2.6fr)_minmax(128px,1.3fr)_minmax(94px,1fr)_minmax(108px,1.1fr)_minmax(90px,0.9fr)_130px_130px_36px] items-center gap-1 border-b border-slate-100 px-4 py-2 text-sm last:border-b-0">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          value={row.query}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={() => {
+            if (row.results.length > 0) onChange(row.rowId, { showDropdown: true })
+          }}
+          readOnly={row.isExisting}
+          placeholder="Nombre, SKU o código de barras…"
+          className={`h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 ${
+            row.isExisting ? 'cursor-default bg-slate-50 text-slate-500' : ''
+          } ${row.isNew ? 'font-mono' : ''}`}
+        />
+        {row.isExisting && (
+          <button
+            type="button"
+            title="Cambiar producto"
+            onClick={() =>
+              onChange(row.rowId, {
+                isExisting: false,
+                productId: null,
+                productName: '',
+                query: '',
+                currentStock: 0,
+              })
+            }
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
           >
-            {row.searching && (
-              <div style={{ padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center', color: 'var(--a-text-3)', fontSize: 12 }}>
-                <span className="admin-spinner" /> Buscando…
-              </div>
-            )}
-            {!row.searching && row.results.map(p => (
-              <div key={p.id} className="product-dropdown-item" onMouseDown={() => selectProduct(p)}>
-                <div className="product-dropdown-item-name">{p.name}</div>
-                <div className="product-dropdown-item-meta">
-                  SKU: {p.sku} · Stock: {p.stock} · {formatMoneyDisplay(parseFloat(p.base_price), currencyFormat)}
-                </div>
-              </div>
-            ))}
-            {!row.searching && (
-              <div className="product-dropdown-create" onMouseDown={createNew}>
-                <Plus size={13} /> Crear: &ldquo;{row.query}&rdquo;
-              </div>
-            )}
-          </div>,
-          document.body
+            <X size={12} />
+          </button>
         )}
 
-        {/* Precio de venta */}
-        <div className="input-money-wrap">
-          {hasProduct
-            ? <input
-                className="admin-input admin-input-sm mono"
-                placeholder="Precio venta"
-                value={row.newBasePrice}
-                onChange={e => onChange(row.rowId, { newBasePrice: formatMoneyInput(e.target.value, currencyFormat) })}
-              />
-            : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
-        </div>
-
-        {/* Stock actual */}
-        <div className="purchase-current-data-cell">
-          {hasProduct ? row.currentStock : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
-        </div>
-
-        {/* Cantidad comprada */}
-        <input
-          type="number"
-          min="1"
-          className="admin-input admin-input-sm mono"
-          style={{ textAlign: 'right' }}
-          value={row.qty}
-          onChange={e => onChange(row.rowId, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
-        />
-
-        {/* Nuevo stock */}
-        <span ref={stockRef} className="new-stock-display">
-          {hasProduct ? stockDisplay : <span style={{ color: 'var(--a-text-3)', fontSize: 13 }}>—</span>}
-        </span>
-
-        {/* Precio compra neto */}
-        <div className="input-money-wrap">
-          <input
-            type="text"
-            inputMode="decimal"
-            className="admin-input admin-input-sm mono"
-            placeholder="0"
-            style={{ textAlign: 'right' }}
-            value={row.purchasePriceNet}
-            onChange={e => handlePurchaseNetChange(e.target.value)}
-          />
-        </div>
-
-        {/* Precio compra bruto */}
-        <div className="input-money-wrap">
-          <input
-            type="text"
-            inputMode="decimal"
-            className="admin-input admin-input-sm mono"
-            placeholder="0"
-            style={{ textAlign: 'right' }}
-            value={row.purchasePriceGross}
-            onChange={e => handlePurchaseGrossChange(e.target.value)}
-          />
-        </div>
-
-        {/* Eliminar */}
-        <button className="admin-btn-icon danger" onClick={() => onRemove(row.rowId)}>
-          <Trash2 size={14} />
-        </button>
+        {row.showDropdown &&
+          dropPos &&
+          typeof window !== 'undefined' &&
+          createPortal(
+            <div
+              ref={dropPortalRef}
+              style={{ position: 'absolute', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
+              className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg"
+            >
+              {row.searching && <div className="px-3 py-2 text-xs text-slate-500">Buscando…</div>}
+              {!row.searching &&
+                row.results.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onMouseDown={() => selectProduct(p)}
+                    className="block w-full px-3 py-2 text-left transition hover:bg-slate-50"
+                  >
+                    <p className="text-sm font-medium text-slate-900">{p.name}</p>
+                    <p className="text-xs text-slate-500">
+                      SKU: {p.sku} · Stock: {p.stock} · {formatMoneyDisplay(parseFloat(p.base_price), currencyFormat)}
+                    </p>
+                  </button>
+                ))}
+              {!row.searching && (
+                <button
+                  type="button"
+                  onMouseDown={createNew}
+                  className="flex w-full items-center gap-1.5 border-t border-slate-200 px-3 py-2 text-left text-sm font-medium text-fuchsia-700 transition hover:bg-fuchsia-50"
+                >
+                  <Plus size={14} /> Crear: “{row.query}”
+                </button>
+              )}
+            </div>,
+            document.body
+          )}
       </div>
 
-    </>
+      {hasProduct ? (
+        <MoneyInput
+          value={row.newBasePrice}
+          onChange={(v) => onChange(row.rowId, { newBasePrice: formatMoneyInput(v, currencyFormat) })}
+          placeholder="Precio venta"
+        />
+      ) : (
+        <span className="text-slate-400">—</span>
+      )}
+
+      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs text-slate-700">
+        {hasProduct ? row.currentStock : '—'}
+      </span>
+
+      <input
+        type="number"
+        min="1"
+        value={row.qty}
+        onChange={(e) => onChange(row.rowId, { qty: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+        className="h-9 w-full rounded-md border border-slate-300 px-2 text-right font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+      />
+
+      <span className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1.5 text-center font-mono text-xs font-semibold text-cyan-700">
+        {hasProduct ? stockDisplay : '—'}
+      </span>
+
+      <MoneyInput value={row.purchasePriceNet} onChange={handlePurchaseNetChange} />
+      <MoneyInput value={row.purchasePriceGross} onChange={handlePurchaseGrossChange} />
+
+      <button
+        type="button"
+        onClick={() => onRemove(row.rowId)}
+        className="rounded p-1.5 text-red-600 transition hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        aria-label="Eliminar fila"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
   )
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────
-
 export default function NuevaCompraPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [notes, setNotes] = useState('')
@@ -498,10 +564,8 @@ export default function NuevaCompraPage() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [currencyFormat, setCurrencyFormat] = useState<CurrencyFormatConfig>(DEFAULT_CURRENCY_FORMAT)
 
-  // ── Init ──
   useEffect(() => {
     fetchSuppliers()
-    fetchCategories()
     fetchSettings()
   }, [])
 
@@ -521,78 +585,65 @@ export default function NuevaCompraPage() {
       const res = await fetch('/api/suppliers')
       const data = await res.json()
       setSuppliers(data.suppliers ?? [])
-    } catch {}
+    } catch {
+      setSuppliers([])
+    }
   }
 
-  async function fetchCategories() {
-    try {
-      const res = await fetch('/api/products?limit=0') // just for categories
-      // Fetch categories from the category endpoint
-      const res2 = await fetch('/api/products?limit=1')
-      const data = await res2.json()
-      // We need categories — fetch from a dedicated endpoint if it exists
-      // For now we'll fetch them inline from product data's category
-    } catch {}
-    // Fetch categories
-    try {
-      const res = await fetch('/api/products?limit=50')
-      const data = await res.json()
-      const seen = new Set<string>()
-      const cats: Category[] = []
-      ;(data.products ?? []).forEach((p: any) => {
-        if (p.category_id && !seen.has(p.category_id)) {
-          seen.add(p.category_id)
-          cats.push({ id: p.category_id, name: p.category_id })
-        }
-      })
-      // Better: fetch from /api/categories if available
-      const catRes = await fetch('/api/products?limit=1&_expand=categories').catch(() => null)
-      setCategories(cats)
-    } catch {}
-  }
-
-  // ── Toast helpers ──
   function toast(type: Toast['type'], msg: string) {
     const id = Date.now()
-    setToasts(t => [...t, { id, type, msg }])
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4500)
+    setToasts((prev) => [...prev, { id, type, msg }])
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500)
   }
 
-  // ── Row helpers ──
   const updateRow = useCallback((rowId: string, patch: Partial<PurchaseRow>) => {
-    setRows(rs => rs.map(r => r.rowId === rowId ? { ...r, ...patch } : r))
+    setRows((prev) => prev.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r)))
   }, [])
 
-  function addRow() { setRows(rs => [...rs, emptyRow()]) }
-  function removeRow(rowId: string) { setRows(rs => rs.length > 1 ? rs.filter(r => r.rowId !== rowId) : rs) }
-  function updateExtraCharge(id: string, patch: Partial<ExtraChargeRow>) {
-    setExtraCharges(items => items.map(item => item.id === id ? { ...item, ...patch } : item))
+  function addRow() {
+    setRows((prev) => [...prev, emptyRow()])
   }
-  function addExtraCharge() { setExtraCharges(items => [...items, emptyExtraCharge()]) }
-  function removeExtraCharge(id: string) { setExtraCharges(items => items.filter(item => item.id !== id)) }
+
+  function removeRow(rowId: string) {
+    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.rowId !== rowId) : prev))
+  }
+
+  function updateExtraCharge(id: string, patch: Partial<ExtraChargeRow>) {
+    setExtraCharges((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
+  }
+
+  function addExtraCharge() {
+    setExtraCharges((prev) => [...prev, emptyExtraCharge()])
+  }
+
+  function removeExtraCharge(id: string) {
+    setExtraCharges((prev) => prev.filter((item) => item.id !== id))
+  }
 
   function handleExtraGrossChange(id: string, value: string) {
     const grossInput = formatMoneyInput(value, currencyFormat)
     const gross = parseMoneyInput(grossInput, currencyFormat)
     updateExtraCharge(id, {
       amountGross: grossInput,
-      amountNet: grossInput.trim() === '' || Number.isNaN(gross)
-        ? ''
-        : formatMoneyInput(Math.round(gross / (1 + IVA_RATE)).toString(), currencyFormat),
+      amountNet:
+        grossInput.trim() === '' || Number.isNaN(gross)
+          ? ''
+          : formatMoneyInput(Math.round(gross / (1 + IVA_RATE)).toString(), currencyFormat),
     })
   }
+
   function handleExtraNetChange(id: string, value: string) {
     const netInput = formatMoneyInput(value, currencyFormat)
     const net = parseMoneyInput(netInput, currencyFormat)
     updateExtraCharge(id, {
       amountNet: netInput,
-      amountGross: netInput.trim() === '' || Number.isNaN(net)
-        ? ''
-        : formatMoneyInput(Math.round(net * (1 + IVA_RATE)).toString(), currencyFormat),
+      amountGross:
+        netInput.trim() === '' || Number.isNaN(net)
+          ? ''
+          : formatMoneyInput(Math.round(net * (1 + IVA_RATE)).toString(), currencyFormat),
     })
   }
 
-  // ── Photo upload ──
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -602,18 +653,20 @@ export default function NuevaCompraPage() {
     reader.readAsDataURL(file)
   }
 
-  // ── Submit ──
   async function handleSubmit() {
-    const unresolvedRows = rows.filter(r => !r.isExisting && !r.isNew && r.query.trim())
+    const unresolvedRows = rows.filter((r) => !r.isExisting && !r.isNew && r.query.trim())
     if (unresolvedRows.length > 0) {
       toast('error', 'Hay productos sin seleccionar. Si no existe, usa "Crear" explícitamente.')
       return
     }
 
-    const validRows = rows.filter(r => (r.isExisting || r.isNew) && r.qty > 0)
-    if (validRows.length === 0) { toast('error', 'Agrega al menos un producto'); return }
+    const validRows = rows.filter((r) => (r.isExisting || r.isNew) && r.qty > 0)
+    if (validRows.length === 0) {
+      toast('error', 'Agrega al menos un producto')
+      return
+    }
 
-    const items = validRows.map(r => ({
+    const items = validRows.map((r) => ({
       product_id: r.isExisting ? r.productId : null,
       product_name: r.productName,
       quantity: r.qty,
@@ -621,22 +674,25 @@ export default function NuevaCompraPage() {
       sale_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
       previous_stock: r.currentStock,
       new_stock: r.currentStock + r.qty,
-      ...(r.isNew ? {
-        new_product: {
-          name: r.productName,
-          sku: r.newSku || null,
-          category_id: r.newCategoryId || null,
-          base_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
-        }
-      } : {}),
+      ...(r.isNew
+        ? {
+            new_product: {
+              name: r.productName,
+              sku: r.newSku || null,
+              category_id: r.newCategoryId || null,
+              base_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
+            },
+          }
+        : {}),
     }))
+
     const extra_items = extraCharges
-      .map(item => ({
+      .map((item) => ({
         description: item.description.trim(),
         amount_gross: parseMoneyInput(item.amountGross, currencyFormat) || 0,
         amount_net: parseMoneyInput(item.amountNet, currencyFormat) || 0,
       }))
-      .filter(item => item.description && item.amount_gross > 0)
+      .filter((item) => item.description && item.amount_gross > 0)
 
     setSubmitting(true)
     try {
@@ -660,7 +716,6 @@ export default function NuevaCompraPage() {
       }
 
       toast('success', `Compra registrada con ${validRows.length} producto(s)`)
-      // Reset form
       setSelectedSupplier(null)
       setInvoiceNumber('')
       setNotes('')
@@ -675,202 +730,168 @@ export default function NuevaCompraPage() {
     }
   }
 
-  // ── Computed totals ──
   const productGrossTotal = rows.reduce((sum, r) => {
     const pp = parseMoneyInput(r.purchasePriceGross, currencyFormat) || 0
-    return sum + (pp * r.qty)
+    return sum + pp * r.qty
   }, 0)
   const productNetTotal = rows.reduce((sum, r) => {
     const pp = parseMoneyInput(r.purchasePriceNet, currencyFormat) || 0
-    return sum + (pp * r.qty)
+    return sum + pp * r.qty
   }, 0)
   const extrasGrossTotal = extraCharges.reduce((sum, item) => sum + (parseMoneyInput(item.amountGross, currencyFormat) || 0), 0)
   const extrasNetTotal = extraCharges.reduce((sum, item) => sum + (parseMoneyInput(item.amountNet, currencyFormat) || 0), 0)
-
   const accumulatedGross = productGrossTotal + extrasGrossTotal
   const accumulatedNet = productNetTotal + extrasNetTotal
-
-  const validProductCount = rows.filter(r => r.isExisting || r.isNew).length
-
-  // ─────────────────────────────────────────────────────────────────────────
+  const validProductCount = rows.filter((r) => r.isExisting || r.isNew).length
 
   return (
-    <>
-      {/* Page header */}
-      <div className="admin-page-header">
+    <section className="space-y-5">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="admin-page-title">Nueva <span>Compra</span></h1>
-          <p className="admin-page-subtitle">Registra una nueva compra a proveedor y actualiza el stock</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 [text-wrap:balance]">
+            Nueva <span className="text-fuchsia-600">Compra</span>
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Registra una nueva compra a proveedor y actualiza el stock</p>
         </div>
-        <button className="admin-btn admin-btn-primary admin-btn-lg" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? <span className="admin-spinner" /> : <CheckCircle2 size={16} />}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-md bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 focus-visible:ring-offset-2 disabled:opacity-60"
+        >
+          {submitting ? <CheckCircle2 size={16} className="animate-pulse" /> : <CheckCircle2 size={16} />}
           {submitting ? 'Registrando…' : 'Finalizar Compra'}
         </button>
-      </div>
+      </header>
 
-      {/* ── FORMULARIO ── */}
-      <div className="admin-panel">
-        <div className="admin-panel-header">
-          <span className="admin-panel-title">Datos de la Compra</span>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold text-slate-800">Datos de la Compra</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Proveedor</label>
+            <SupplierSelector
+              suppliers={suppliers}
+              selected={selectedSupplier}
+              onSelect={setSelectedSupplier}
+              onCreated={(s) => setSuppliers((prev) => [...prev, s])}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="invoice_number" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              N° Factura / Folio
+            </label>
+            <input
+              id="invoice_number"
+              name="invoice_number"
+              value={invoiceNumber}
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+              placeholder="Ej: FAC-0001234"
+              className="h-10 w-full rounded-md border border-slate-300 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="invoice_file" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Foto Factura
+            </label>
+            <label
+              htmlFor="invoice_file"
+              className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 text-sm text-slate-600 transition hover:bg-slate-100"
+            >
+              <Upload size={14} />
+              <span className="truncate">{photoName || 'Subir foto o PDF'}</span>
+            </label>
+            <input id="invoice_file" name="invoice_file" type="file" accept="image/*,.pdf" onChange={handlePhoto} className="hidden" />
+          </div>
         </div>
-        <div className="admin-panel-body">
-          {/* Línea 1: Proveedor · N° Factura · Subir Factura */}
-          <div className="admin-form-grid cols-3" style={{ alignItems: 'end' }}>
-            <div className="admin-form-field">
-              <label className="admin-label">Proveedor</label>
-              <SupplierSelector
-                suppliers={suppliers}
-                selected={selectedSupplier}
-                onSelect={setSelectedSupplier}
-                onCreated={s => setSuppliers(prev => [...prev, s])}
-              />
-            </div>
-
-            <div className="admin-form-field">
-              <label className="admin-label">N° Factura / Folio</label>
-              <input
-                className="admin-input mono"
-                placeholder="Ej: FAC-0001234"
-                value={invoiceNumber}
-                onChange={e => setInvoiceNumber(e.target.value)}
-              />
-            </div>
-
-            <div className="admin-form-field">
-              <label className="admin-label">Foto Factura</label>
-              <div className={`photo-upload-zone photo-upload-sm${photoB64 ? ' has-file' : ''}`}>
-                <input type="file" accept="image/*,.pdf" onChange={handlePhoto} title="Subir foto de factura" />
-                {photoB64
-                  ? <>
-                      {photoB64.startsWith('data:image') && (
-                        <img src={photoB64} alt="Factura" className="photo-upload-preview" />
-                      )}
-                      <span className="photo-upload-text" style={{ color: 'var(--a-green)' }}>✓ {photoName}</span>
-                    </>
-                  : <>
-                      <Upload size={16} style={{ color: 'var(--a-text-3)' }} />
-                      <span className="photo-upload-text">Subir foto o PDF</span>
-                    </>
-                }
-              </div>
-            </div>
-          </div>
-
-          {/* Línea 2: Notas */}
-          <div className="admin-form-grid cols-1 a-mt-4">
-            <div className="admin-form-field">
-              <label className="admin-label">Notas (opcional)</label>
-              <input
-                className="admin-input"
-                placeholder="Observaciones, condiciones de pago…"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
+        <div className="mt-4 space-y-1.5">
+          <label htmlFor="purchase_notes" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Notas (opcional)
+          </label>
+          <input
+            id="purchase_notes"
+            name="purchase_notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Observaciones, condiciones de pago…"
+            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+          />
         </div>
       </div>
 
-      {/* ── PRODUCTOS ── */}
-      <div className="admin-panel">
-        <div className="admin-panel-header">
-          <span className="admin-panel-title">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-800">
             Productos Comprados
-            {validProductCount > 0 && (
-              <span style={{ marginLeft: 8, color: 'var(--a-accent)', fontSize: 10 }}>
-                {validProductCount} ítem{validProductCount !== 1 ? 's' : ''}
-              </span>
-            )}
-          </span>
+            {validProductCount > 0 && <span className="ml-2 text-xs text-fuchsia-600">{validProductCount} ítem(s)</span>}
+          </h2>
         </div>
 
-        {/* Header columns */}
-        <div className="purchase-items-container">
-          <div className="purchase-items-scroll">
-            <div className="purchase-items-table">
-              <div className="purchase-items-head">
-                <span className="purchase-col-label">Buscar Producto</span>
-                <span className="purchase-col-label">Precio Venta Bruto</span>
-                <span className="purchase-col-label">Stock Actual</span>
-                <span className="purchase-col-label a-text-right">Cantidad Comprada</span>
-                <span className="purchase-col-label" style={{ color: 'var(--a-cyan)' }}>Nuevo Stock</span>
-                <span className="purchase-col-label a-text-right">Precio Compra Neto</span>
-                <span className="purchase-col-label a-text-right">Precio Compra Bruto</span>
-                <span className="purchase-col-label"></span>
-              </div>
-
-              {rows.map(row => (
-                <ProductRow
-                  key={row.rowId}
-                  row={row}
-                  categories={categories}
-                  currencyFormat={currencyFormat}
-                  onChange={updateRow}
-                  onRemove={removeRow}
-                />
-              ))}
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
+            <div className="grid grid-cols-[minmax(220px,2.6fr)_minmax(128px,1.3fr)_minmax(94px,1fr)_minmax(108px,1.1fr)_minmax(90px,0.9fr)_130px_130px_36px] gap-1 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">
+              <span>Buscar Producto</span>
+              <span>Precio Venta Bruto</span>
+              <span>Stock Actual</span>
+              <span className="text-right">Cantidad Comprada</span>
+              <span className="text-cyan-700">Nuevo Stock</span>
+              <span className="text-right">Precio Compra Neto</span>
+              <span className="text-right">Precio Compra Bruto</span>
+              <span />
             </div>
+            {rows.map((row) => (
+              <ProductRow key={row.rowId} row={row} currencyFormat={currencyFormat} onChange={updateRow} onRemove={removeRow} />
+            ))}
           </div>
-
         </div>
 
-        {/* Add row */}
-        <div style={{ padding: '10px 16px 14px' }}>
-          <button className="add-row-btn" onClick={addRow}>
-            <Plus size={13} /> Agregar producto
+        <div className="px-4 py-3">
+          <button
+            type="button"
+            onClick={addRow}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+          >
+            <Plus size={14} /> Agregar producto
           </button>
         </div>
 
-        {/* Otros cargos no inventariables */}
-        <div className="purchase-extra-panel">
-          <div className="purchase-extra-header">
-            <div className="purchase-total-label">Otros cargos de factura (no producto)</div>
-            <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={addExtraCharge}>
+        <div className="border-t border-slate-200 px-4 py-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800">Otros cargos de factura (no producto)</h3>
+            <button
+              type="button"
+              onClick={addExtraCharge}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            >
               <Plus size={13} /> Agregar cargo
             </button>
           </div>
 
           {extraCharges.length === 0 ? (
-            <div className="purchase-extra-empty">Sin cargos adicionales</div>
+            <p className="text-sm text-slate-500">Sin cargos adicionales</p>
           ) : (
-            <div className="purchase-extra-list">
-              <div className="purchase-extra-columns">
-                <span></span>
-                <span className="purchase-col-label a-text-right">Precio Compra Neto</span>
-                <span className="purchase-col-label a-text-right">Precio Compra Bruto</span>
-                <span></span>
+            <div className="space-y-2">
+              <div className="grid grid-cols-[1fr_130px_130px_36px] gap-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">
+                <span />
+                <span className="text-right">Precio Compra Neto</span>
+                <span className="text-right">Precio Compra Bruto</span>
+                <span />
               </div>
-              {extraCharges.map(item => (
-                <div key={item.id} className="purchase-extra-row">
+              {extraCharges.map((item) => (
+                <div key={item.id} className="grid grid-cols-[1fr_130px_130px_36px] items-center gap-1">
                   <input
-                    className="admin-input admin-input-sm"
-                    placeholder="Ej: Transporte, embalaje, comisión..."
                     value={item.description}
-                    onChange={e => updateExtraCharge(item.id, { description: e.target.value })}
+                    onChange={(e) => updateExtraCharge(item.id, { description: e.target.value })}
+                    placeholder="Ej: Transporte, embalaje, comisión…"
+                    className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
                   />
-                  <div className="input-money-wrap">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="admin-input admin-input-sm mono"
-                      placeholder="0"
-                      style={{ textAlign: 'right' }}
-                      value={item.amountNet}
-                      onChange={e => handleExtraNetChange(item.id, e.target.value)}
-                    />
-                  </div>
-                  <div className="input-money-wrap">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="admin-input admin-input-sm mono"
-                      placeholder="0"
-                      style={{ textAlign: 'right' }}
-                      value={item.amountGross}
-                      onChange={e => handleExtraGrossChange(item.id, e.target.value)}
-                    />
-                  </div>
-                  <button className="admin-btn-icon danger" onClick={() => removeExtraCharge(item.id)}>
+                  <MoneyInput value={item.amountNet} onChange={(v) => handleExtraNetChange(item.id, v)} />
+                  <MoneyInput value={item.amountGross} onChange={(v) => handleExtraGrossChange(item.id, v)} />
+                  <button
+                    type="button"
+                    onClick={() => removeExtraCharge(item.id)}
+                    className="rounded p-1.5 text-red-600 transition hover:bg-red-50"
+                    aria-label="Eliminar cargo"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -879,46 +900,32 @@ export default function NuevaCompraPage() {
           )}
         </div>
 
-        {/* Totales */}
-        <div className="purchase-totals-bar">
-          <div className="purchase-reconcile-table">
-            <div className="purchase-reconcile-head">
-              <span>Resumen</span>
-              <span className="a-text-right">Neto</span>
-              <span className="a-text-right">Bruto</span>
-              <span></span>
-            </div>
-            <div className="purchase-reconcile-row reconcile-row-total">
-              <span>Total compra</span>
-              <span className="a-text-right">{formatMoneyDisplay(accumulatedNet, currencyFormat)}</span>
-              <span className="a-text-right">{formatMoneyDisplay(accumulatedGross, currencyFormat)}</span>
-              <span></span>
-            </div>
-            <div className="purchase-reconcile-row muted">
-              <span>
-                Solo productos
-                <span className="reconcile-row-note">ref. inventario</span>
-              </span>
-              <span className="a-text-right">{formatMoneyDisplay(productNetTotal, currencyFormat)}</span>
-              <span className="a-text-right">{formatMoneyDisplay(productGrossTotal, currencyFormat)}</span>
-              <span></span>
-            </div>
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="ml-auto grid w-full max-w-md grid-cols-3 gap-2 text-sm">
+            <span className="font-medium text-slate-700">Resumen</span>
+            <span className="text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Neto</span>
+            <span className="text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Bruto</span>
+
+            <span className="font-semibold text-slate-900">Total compra</span>
+            <span className="text-right font-semibold text-slate-900">{formatMoneyDisplay(accumulatedNet, currencyFormat)}</span>
+            <span className="text-right font-semibold text-slate-900">{formatMoneyDisplay(accumulatedGross, currencyFormat)}</span>
+
+            <span className="text-slate-600">Solo productos</span>
+            <span className="text-right text-slate-700">{formatMoneyDisplay(productNetTotal, currencyFormat)}</span>
+            <span className="text-right text-slate-700">{formatMoneyDisplay(productGrossTotal, currencyFormat)}</span>
+
             {extraCharges.length > 0 && (
-              <div className="purchase-reconcile-row muted">
-                <span>
-                  Otros cargos
-                  <span className="reconcile-row-note">no inventario</span>
-                </span>
-                <span className="a-text-right">{formatMoneyDisplay(extrasNetTotal, currencyFormat)}</span>
-                <span className="a-text-right">{formatMoneyDisplay(extrasGrossTotal, currencyFormat)}</span>
-                <span></span>
-              </div>
+              <>
+                <span className="text-slate-600">Otros cargos</span>
+                <span className="text-right text-slate-700">{formatMoneyDisplay(extrasNetTotal, currencyFormat)}</span>
+                <span className="text-right text-slate-700">{formatMoneyDisplay(extrasGrossTotal, currencyFormat)}</span>
+              </>
             )}
           </div>
         </div>
       </div>
 
-      <Toasts toasts={toasts} onRemove={id => setToasts(t => t.filter(x => x.id !== id))} />
-    </>
+      <Toasts toasts={toasts} onRemove={(id) => setToasts((prev) => prev.filter((x) => x.id !== id))} />
+    </section>
   )
 }

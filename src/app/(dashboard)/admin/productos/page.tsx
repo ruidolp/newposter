@@ -36,6 +36,7 @@ interface Product {
   created_at: string
   updated_at: string
   cost_history?: CostHistoryEntry[]
+  price_history?: PriceHistoryEntry[]
 }
 
 interface CostHistoryEntry {
@@ -43,6 +44,20 @@ interface CostHistoryEntry {
   source: 'PURCHASE' | 'MANUAL' | 'SYSTEM'
   previous_cost: string | null
   new_cost: string
+  currency: string
+  purchase_id: string | null
+  supplier_id: string | null
+  invoice_number: string | null
+  reason: string | null
+  created_by: string | null
+  created_at: string
+}
+
+interface PriceHistoryEntry {
+  id: string
+  source: 'PURCHASE' | 'MANUAL' | 'SYSTEM'
+  previous_price: string | null
+  new_price: string
   currency: string
   purchase_id: string | null
   supplier_id: string | null
@@ -106,10 +121,6 @@ function saveCols(cols: ColId[]) {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n)
-}
-
 function toInputNumberString(value: string | number | null | undefined, cfg: CurrencyFormatConfig) {
   if (value === null || value === undefined || value === '') return ''
   const parsed = Number(value)
@@ -132,14 +143,28 @@ function emptyForm() {
 
 function Toasts({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
   return (
-    <div className="admin-toast-container">
+    <div className="fixed right-4 top-4 z-[500] space-y-2">
       {toasts.map(t => (
-        <div key={t.id} className={`admin-toast ${t.type}`}>
-          <span className={`admin-toast-icon ${t.type}`}>
+        <div
+          key={t.id}
+          className={`flex min-w-[260px] items-center gap-2 rounded-xl border px-3 py-2 text-sm shadow-lg ${
+            t.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : t.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : 'border-sky-200 bg-sky-50 text-sky-800'
+          }`}
+        >
+          <span className="shrink-0">
             {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : <Info size={15} />}
           </span>
-          <span className="admin-toast-msg">{t.msg}</span>
-          <button className="admin-btn-icon" style={{ marginLeft: 'auto' }} onClick={() => onRemove(t.id)}><X size={13} /></button>
+          <span className="text-sm">{t.msg}</span>
+          <button
+            className="ml-auto rounded-md p-1 text-current/70 transition hover:bg-black/5 hover:text-current"
+            onClick={() => onRemove(t.id)}
+          >
+            <X size={13} />
+          </button>
         </div>
       ))}
     </div>
@@ -168,10 +193,9 @@ function ColSelector({ visible, onChange }: { visible: ColId[]; onChange: (c: Co
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} className="relative">
       <button
-        className={`admin-btn admin-btn-sm admin-btn-secondary`}
-        style={{ gap: 6, display: 'flex', alignItems: 'center' }}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
         onClick={() => setOpen(o => !o)}
         title="Elegir qué datos mostrar en la tabla"
       >
@@ -181,37 +205,27 @@ function ColSelector({ visible, onChange }: { visible: ColId[]; onChange: (c: Co
       </button>
 
       {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 200,
-          background: 'var(--a-bg-1)', border: '1px solid var(--a-border)',
-          borderRadius: 'var(--a-radius)', boxShadow: 'var(--a-shadow-lg)',
-          padding: '8px 0', minWidth: 170,
-        }}>
-          <div style={{ padding: '4px 14px 8px', fontSize: 10, fontWeight: 700, letterSpacing: 1, color: 'var(--a-text-3)', textTransform: 'uppercase' }}>
+        <div className="absolute right-0 top-[calc(100%+6px)] z-[200] min-w-[190px] rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
+          <div className="px-3.5 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
             Datos visibles en tabla
           </div>
           {COL_DEFS.map(col => (
-            <label key={col.id} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 14px', cursor: 'pointer', fontSize: 12,
-              color: 'var(--a-text-1)',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--a-bg-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = '')}
+            <label
+              key={col.id}
+              className="flex cursor-pointer items-center gap-2 px-3.5 py-1.5 text-xs text-slate-700 transition hover:bg-slate-50"
             >
               <input
                 type="checkbox"
                 checked={visible.includes(col.id)}
                 onChange={() => toggle(col.id)}
-                style={{ accentColor: 'var(--a-accent)', width: 13, height: 13 }}
+                className="h-3.5 w-3.5 accent-fuchsia-600"
               />
               {col.label}
             </label>
           ))}
-          <div style={{ borderTop: '1px solid var(--a-border)', margin: '6px 0 2px', padding: '4px 14px 0' }}>
+          <div className="mx-0 mt-1.5 border-t border-slate-200 px-3.5 pt-1">
             <button
-              className="admin-btn admin-btn-ghost admin-btn-sm"
-              style={{ width: '100%', justifyContent: 'center', fontSize: 11 }}
+              className="w-full rounded-lg px-2 py-1.5 text-center text-xs font-semibold text-fuchsia-700 transition hover:bg-fuchsia-50"
               onClick={() => onChange(DEFAULT_COLS)}
             >
               Restablecer
@@ -261,6 +275,9 @@ function ProductModal({
   const [costHistory, setCostHistory] = useState<CostHistoryEntry[]>(product?.cost_history ?? [])
   const [loadingCostHistory, setLoadingCostHistory] = useState<boolean>(Boolean(product && !product.cost_history))
   const [costDrawerOpen, setCostDrawerOpen] = useState(false)
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>(product?.price_history ?? [])
+  const [loadingPriceHistory, setLoadingPriceHistory] = useState<boolean>(Boolean(product && !product.price_history))
+  const [priceDrawerOpen, setPriceDrawerOpen] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [creatingCat, setCreatingCat] = useState(false)
   const [catSearch, setCatSearch] = useState('')
@@ -307,34 +324,40 @@ function ProductModal({
 
   useEffect(() => {
     if (!isEdit || !product) return
-    if (product.cost_history) {
+    if (product.cost_history && product.price_history) {
       setCostHistory(product.cost_history)
+      setPriceHistory(product.price_history)
       setLoadingCostHistory(false)
+      setLoadingPriceHistory(false)
       return
     }
     let cancelled = false
     setLoadingCostHistory(true)
+    setLoadingPriceHistory(true)
     fetch(`/api/products/${product.id}`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error('error')))
       .then(data => {
         if (!cancelled) {
           setCostHistory(data.cost_history ?? [])
+          setPriceHistory(data.price_history ?? [])
         }
       })
       .catch(() => {
         if (!cancelled) {
           setCostHistory([])
+          setPriceHistory([])
         }
       })
       .finally(() => {
         if (!cancelled) {
           setLoadingCostHistory(false)
+          setLoadingPriceHistory(false)
         }
       })
     return () => { cancelled = true }
   }, [isEdit, product])
 
-  function sourceLabel(source: CostHistoryEntry['source']) {
+  function sourceLabel(source: 'PURCHASE' | 'MANUAL' | 'SYSTEM') {
     if (source === 'PURCHASE') return 'Compra'
     if (source === 'MANUAL') return 'Ajuste manual'
     return 'Sistema'
@@ -346,6 +369,12 @@ function ProductModal({
   const actualEntryId = currentCostValue === null
     ? null
     : (costHistory.find((entry) => Number(entry.new_cost) === currentCostValue)?.id ?? null)
+  const currentPriceValue = product?.base_price === null || product?.base_price === undefined || Number.isNaN(Number(product?.base_price))
+    ? null
+    : Number(product.base_price)
+  const actualPriceEntryId = currentPriceValue === null
+    ? null
+    : (priceHistory.find((entry) => Number(entry.new_price) === currentPriceValue)?.id ?? null)
 
   function toggleCat(id: string) {
     setForm(f => {
@@ -425,67 +454,68 @@ function ProductModal({
   }
 
   return (
-    <div className="admin-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="admin-modal" style={{ maxWidth: 980, width: 'min(980px, 96vw)', position: 'relative', overflow: 'hidden' }}>
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">{isEdit ? 'Editar Producto' : 'Nuevo Producto'}</span>
-          <button className="admin-btn-icon" onClick={onClose}><X size={16} /></button>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/40 p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="relative w-[min(980px,96vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+          <span className="text-base font-semibold text-slate-900">{isEdit ? 'Editar Producto' : 'Nuevo Producto'}</span>
+          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <div className="admin-modal-body" style={{ maxHeight: '78vh', overflowY: 'auto' }}>
+        <div className="max-h-[78vh] space-y-4 overflow-y-auto px-5 py-4">
           {errors._global && (
-            <div className="prod-error-banner"><AlertCircle size={14} /> {errors._global}</div>
+            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"><AlertCircle size={14} /> {errors._global}</div>
           )}
 
-          <div style={{ borderBottom: '1px solid var(--a-border)', marginBottom: 14, paddingBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--a-text-1)' }}>
+          <div className="space-y-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xl font-extrabold text-black">
                 GENERAL
               </div>
-              <label className="prod-toggle-label" style={{ marginLeft: 'auto' }}>
-                <button
-                  type="button"
-                  className={`prod-toggle${form.active ? ' on' : ''}`}
-                  onClick={() => set('active', !form.active)}
-                  aria-label="Disponibilidad del producto"
+              <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-fuchsia-600"
+                  checked={form.active}
+                  onChange={() => set('active', !form.active)}
+                  aria-label="Estado del producto"
                 />
-                <span>{form.active ? 'DISPONIBLE' : 'NO DISPONIBLE'}</span>
+                <span>{form.active ? 'ACTIVO' : 'INACTIVO'}</span>
               </label>
             </div>
-            <div className="admin-form-grid cols-2 a-mt-4" style={{ alignItems: 'end' }}>
-              <div className="admin-form-field">
-                <label className="admin-label">Nombre del producto *</label>
-                <input className={`admin-input${errors.name ? ' input-error' : ''}`} value={form.name}
+            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre del producto *</label>
+                <input className={`h-10 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-2 focus:ring-fuchsia-100 ${errors.name ? 'border-rose-400' : 'border-slate-200 focus:border-fuchsia-500'}`} value={form.name}
                   onChange={e => set('name', e.target.value)} placeholder="Ej: Bebida Cola 500ml" />
-                {errors.name && <span className="field-error">{errors.name}</span>}
+                {errors.name && <span className="text-xs text-rose-600">{errors.name}</span>}
               </div>
-              <div className="admin-form-field">
-                <label className="admin-label">SKU *</label>
-                <input className={`admin-input mono${errors.sku ? ' input-error' : ''}`} value={form.sku}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">SKU *</label>
+                <input className={`h-10 w-full rounded-lg border px-3 font-mono text-sm outline-none transition focus:ring-2 focus:ring-fuchsia-100 ${errors.sku ? 'border-rose-400' : 'border-slate-200 focus:border-fuchsia-500'}`} value={form.sku}
                   onChange={e => set('sku', e.target.value)} placeholder="Ej: BEB-001" />
-                {errors.sku && <span className="field-error">{errors.sku}</span>}
+                {errors.sku && <span className="text-xs text-rose-600">{errors.sku}</span>}
               </div>
             </div>
-            <div className="admin-form-grid cols-2 a-mt-4">
-              <div className="admin-form-field">
-                <label className="admin-label">Código de Barras</label>
-                <input className="admin-input mono" value={form.barcode}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Código de Barras</label>
+                <input className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={form.barcode}
                   onChange={e => set('barcode', e.target.value)} placeholder="Ej: 7801234567890" />
               </div>
             </div>
 
-            <div className="admin-form-field a-mt-4">
-              <label className="admin-label">Categorías</label>
-              <div className="prod-cat-selector">
-                <div className="prod-cat-selected-row">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Categorías</label>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center gap-2">
                   {selectedCategories.length === 0 ? (
-                    <span className="prod-cat-empty">Sin categorías seleccionadas</span>
+                    <span className="text-xs text-slate-500">Sin categorías seleccionadas</span>
                   ) : (
                     selectedCategories.map(c => (
                       <button
                         key={c.id}
                         type="button"
-                        className="prod-cat-chip selected"
+                        className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2 py-1 text-xs font-medium text-fuchsia-700"
                         onClick={() => toggleCat(c.id)}
                         title={`Quitar ${c.name}`}
                       >
@@ -497,7 +527,7 @@ function ProductModal({
                   {selectedCategories.length > 0 && (
                     <button
                       type="button"
-                      className="prod-cat-clear"
+                      className="ml-auto text-xs font-semibold text-fuchsia-700 transition hover:text-fuchsia-800"
                       onClick={() => set('category_ids', [])}
                     >
                       Limpiar
@@ -505,27 +535,27 @@ function ProductModal({
                   )}
                 </div>
 
-                <div className="prod-cat-search-wrap">
-                  <Search size={13} className="prod-cat-search-icon" />
+                <div className="relative">
+                  <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="admin-input admin-input-sm prod-cat-search"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
                     placeholder="Buscar categoría..."
                     value={catSearch}
                     onChange={e => setCatSearch(e.target.value)}
                   />
                 </div>
 
-                <div className="prod-cat-options">
+                <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
                   {localCategories.length === 0 ? (
-                    <div className="prod-cat-empty">Sin categorías aún</div>
+                    <div className="text-xs text-slate-500">Sin categorías aún</div>
                   ) : availableCategories.length === 0 ? (
-                    <div className="prod-cat-empty">No hay coincidencias</div>
+                    <div className="text-xs text-slate-500">No hay coincidencias</div>
                   ) : (
                     availableCategories.map(c => (
                       <button
                         key={c.id}
                         type="button"
-                        className="prod-cat-chip"
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:border-fuchsia-300 hover:text-fuchsia-700"
                         onClick={() => toggleCat(c.id)}
                       >
                         <Plus size={11} />
@@ -535,84 +565,75 @@ function ProductModal({
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input className="admin-input admin-input-sm" placeholder="Nueva categoría…" value={newCatName}
+              <div className="mt-2 flex gap-2">
+                <input className="h-9 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" placeholder="Nueva categoría…" value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCreateCat()}
-                  style={{ flex: 1 }} />
-                <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={handleCreateCat}
+                />
+                <button className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" onClick={handleCreateCat}
                   disabled={creatingCat || !newCatName.trim()}>
-                  {creatingCat ? <span className="admin-spinner" /> : <Plus size={13} />}
+                  {creatingCat ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" /> : <Plus size={13} />}
                 </button>
               </div>
             </div>
           </div>
 
-          <div style={{ borderBottom: '1px solid var(--a-border)', marginBottom: 14, paddingBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--a-text-1)' }}>
+          <div className="space-y-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xl font-extrabold text-black">
                 PRECIOS
               </div>
             </div>
-            <div className="admin-form-grid cols-2 a-mt-3">
-              <div className="admin-form-field">
-                <label className="admin-label">Precio Venta Bruto *</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--a-text-3)',
-                    fontSize: 12,
-                    fontFamily: 'var(--a-font-mono)',
-                    pointerEvents: 'none',
-                  }}>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <span>Precio Venta Bruto *</span>
+                  {isEdit && (
+                    <button
+                      type="button"
+                      className="p-0 text-xs font-bold normal-case text-fuchsia-700 transition hover:text-fuchsia-800"
+                      onClick={() => { setPriceDrawerOpen(true); setCostDrawerOpen(false) }}
+                    >
+                      Precios Historicos
+                    </button>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-slate-500">
                     {currencyFormat.currency_symbol || '$'}
                   </span>
-                  <input type="text" inputMode="decimal" className={`admin-input mono${errors.base_price ? ' input-error' : ''}`}
-                    style={{ paddingLeft: 24 }}
+                  <input type="text" inputMode="decimal" className={`h-10 w-full rounded-lg border pl-6 pr-3 font-mono text-sm outline-none transition focus:ring-2 focus:ring-fuchsia-100 ${errors.base_price ? 'border-rose-400' : 'border-slate-200 focus:border-fuchsia-500'}`}
                     value={form.base_price} onChange={e => setMoney('base_price', e.target.value)} placeholder="0" />
                 </div>
-                {errors.base_price && <span className="field-error">{errors.base_price}</span>}
+                {errors.base_price && <span className="text-xs text-rose-600">{errors.base_price}</span>}
                 {form.base_price && parseMoneyInput(form.base_price, currencyFormat) > 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--a-text-3)', marginTop: 2, display: 'block' }}>
+                  <span className="mt-0.5 block text-xs text-slate-500">
                     PRECIO VENTA NETO: {formatMoneyDisplay(Math.round(parseMoneyInput(form.base_price, currencyFormat) / 1.19), currencyFormat)}
                   </span>
                 )}
               </div>
-              <div className="admin-form-field">
-                <label className="admin-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div className="space-y-1">
+                <label className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <span>Costo Producto Bruto</span>
                   {isEdit && (
                     <button
                       type="button"
-                      className="admin-btn admin-btn-ghost admin-btn-sm"
-                      style={{ padding: 0, minHeight: 'unset', border: 'none', color: 'var(--a-accent)', fontSize: 11, fontWeight: 700 }}
-                      onClick={() => setCostDrawerOpen(true)}
+                      className="p-0 text-xs font-bold normal-case text-fuchsia-700 transition hover:text-fuchsia-800"
+                      onClick={() => { setCostDrawerOpen(true); setPriceDrawerOpen(false) }}
                     >
-                      PRECIOS HISTORIAL COSTOS
+                      Costos Historicos
                     </button>
                   )}
                 </label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--a-text-3)',
-                    fontSize: 12,
-                    fontFamily: 'var(--a-font-mono)',
-                    pointerEvents: 'none',
-                  }}>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-slate-500">
                     {currencyFormat.currency_symbol || '$'}
                   </span>
-                  <input type="text" inputMode="decimal" className="admin-input mono" style={{ paddingLeft: 24 }} value={form.cost}
+                  <input type="text" inputMode="decimal" className="h-10 w-full rounded-lg border border-slate-200 pl-6 pr-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={form.cost}
                     onChange={e => setMoney('cost', e.target.value)} placeholder="0" />
                 </div>
                 {form.cost && parseMoneyInput(form.cost, currencyFormat) > 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--a-text-3)', marginTop: 2, display: 'block' }}>
+                  <span className="mt-0.5 block text-xs text-slate-500">
                     COSTO NETO: {formatMoneyDisplay(Math.round(parseMoneyInput(form.cost, currencyFormat) / 1.19), currencyFormat)}
                   </span>
                 )}
@@ -620,75 +641,73 @@ function ProductModal({
             </div>
           </div>
 
-          <div style={{ borderBottom: '1px solid var(--a-border)', marginBottom: 14, paddingBottom: 10 }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--a-text-1)' }}>
+          <div className="space-y-3 border-b border-slate-200 pb-3">
+            <div className="text-xl font-extrabold text-black">
               INVENTARIO
             </div>
-            <div className="admin-form-grid cols-2 a-mt-3">
-              <div className="admin-form-field">
-                <label className="admin-label">Stock actual</label>
-                <input type="number" min="0" className="admin-input mono" value={form.stock}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stock actual</label>
+                <input type="number" min="0" className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={form.stock}
                   onChange={e => set('stock', e.target.value)} />
               </div>
-              <div className="admin-form-field">
-                <label className="admin-label">Alerta Stock Bajo</label>
-                <input type="number" min="0" className="admin-input mono" value={form.low_stock_alert}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Alerta Stock Bajo</label>
+                <input type="number" min="0" className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={form.low_stock_alert}
                   onChange={e => set('low_stock_alert', e.target.value)} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 24, paddingTop: 10, flexWrap: 'wrap' }}>
-              <label className="prod-toggle-label">
-                <button type="button" className={`prod-toggle${form.track_stock ? ' on' : ''}`}
-                  onClick={() => set('track_stock', !form.track_stock)} aria-label="Control de stock" />
+            <div className="flex flex-wrap gap-6 pt-1">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-fuchsia-600"
+                  checked={form.track_stock}
+                  onChange={() => set('track_stock', !form.track_stock)}
+                  aria-label="Control de stock"
+                />
                 <span>Controlar stock</span>
               </label>
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--a-text-1)' }}>
+            <div className="text-xl font-extrabold text-black">
               ECOMMERCE
             </div>
-            <div className="admin-form-grid cols-2 a-mt-3">
-              <div className="admin-form-field">
-                <label className="admin-label">Descripción Web</label>
-                <textarea className="admin-textarea" rows={3} value={form.description}
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Descripción Web</label>
+                <textarea className="min-h-24 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" rows={3} value={form.description}
                   onChange={e => set('description', e.target.value)} placeholder="Descripción visible en ecommerce…" />
               </div>
-              <div className="admin-form-field">
-                <label className="admin-label">Adjuntar imágenes</label>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Adjuntar imágenes</label>
                 <input
                   type="file"
                   accept="image/*"
                   multiple
-                  className="admin-input"
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition file:mr-3 file:rounded-md file:border-0 file:bg-fuchsia-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-fuchsia-700 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
                   onChange={(e) => {
                     handleAttachEcommerceImages(e.target.files)
                     e.currentTarget.value = ''
                   }}
                 />
-                <span style={{ marginTop: 4, fontSize: 11, color: 'var(--a-text-3)' }}>
+                <span className="mt-1 block text-xs text-slate-500">
                   Hasta 12 imágenes
                 </span>
                 {form.ecommerce_images.length > 0 && (
-                  <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+                  <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
                     {form.ecommerce_images.map((src, idx) => (
-                      <div key={`${idx}-${src.slice(0, 20)}`} style={{ position: 'relative' }}>
+                      <div key={`${idx}-${src.slice(0, 20)}`} className="relative">
                         <img
                           src={src}
                           alt={`Producto ${idx + 1}`}
-                          style={{
-                            width: '100%',
-                            height: 74,
-                            objectFit: 'cover',
-                            borderRadius: 'var(--a-radius-sm)',
-                            border: '1px solid var(--a-border)',
-                          }}
+                          className="h-[74px] w-full rounded-md border border-slate-200 object-cover"
                         />
                         <button
                           type="button"
-                          className="admin-btn-icon"
-                          style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                          className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white transition hover:bg-black/70"
                           onClick={() => removeEcommerceImage(idx)}
                           title="Quitar imagen"
                         >
@@ -700,12 +719,17 @@ function ProductModal({
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 24, paddingTop: 12, flexWrap: 'wrap' }}>
-              <label className="prod-toggle-label">
-                <button type="button" className={`prod-toggle${form.online_visible ? ' on' : ''}`}
-                  onClick={() => set('online_visible', !form.online_visible)} aria-label="Visible ecommerce" />
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {form.online_visible ? <Globe size={12} style={{ color: 'var(--a-accent)' }} /> : <EyeOff size={12} style={{ color: 'var(--a-text-3)' }} />}
+            <div className="flex flex-wrap gap-6 pt-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-fuchsia-600"
+                  checked={form.online_visible}
+                  onChange={() => set('online_visible', !form.online_visible)}
+                  aria-label="Visible ecommerce"
+                />
+                <span className="inline-flex items-center gap-1">
+                  {form.online_visible ? <Globe size={12} className="text-fuchsia-700" /> : <EyeOff size={12} className="text-slate-500" />}
                   VISIBLE ECOMMERCE
                 </span>
               </label>
@@ -713,109 +737,170 @@ function ProductModal({
           </div>
         </div>
 
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <span className="admin-spinner" /> : <CheckCircle2 size={15} />}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={onClose}>Cancelar</button>
+          <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-fuchsia-600 px-4 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60" onClick={handleSave} disabled={saving}>
+            {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <CheckCircle2 size={15} />}
             {saving ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Crear Producto'}
           </button>
         </div>
 
         {isEdit && costDrawerOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'rgba(10, 14, 26, 0.34)',
-              zIndex: 20,
-            }}
-            onClick={() => setCostDrawerOpen(false)}
-          />
+          <div className="fixed inset-0 z-[330]">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-950/45"
+              onClick={() => setCostDrawerOpen(false)}
+              aria-label="Cerrar historial de costos"
+            />
+
+            <aside className="absolute right-0 top-0 flex h-full w-[min(560px,100vw)] flex-col border-l border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <span className="text-base font-semibold text-slate-900">Historial de costos</span>
+                <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={() => setCostDrawerOpen(false)}><X size={16} /></button>
+              </div>
+              <div className="border-b border-slate-200 px-3 py-2 text-[11px] text-slate-500">
+                Registros más recientes primero
+              </div>
+              <div className="flex-1 overflow-y-auto bg-slate-50">
+                {loadingCostHistory ? (
+                  <div className="px-3 py-3 text-xs text-slate-500">
+                    Cargando historial...
+                  </div>
+                ) : costHistory.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-slate-500">
+                    Sin historial de costos registrado.
+                  </div>
+                ) : (
+                  <div>
+                    {costHistory.map(entry => {
+                      const prev = entry.previous_cost === null ? null : Number(entry.previous_cost)
+                      const next = Number(entry.new_cost)
+                      const purchaseRef = entry.invoice_number || entry.purchase_id
+                      return (
+                        <div key={entry.id} className="border-b border-slate-200 bg-white px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-800">{sourceLabel(entry.source)}</span>
+                              {actualEntryId === entry.id && (
+                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  ACTUAL
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{new Date(entry.created_at).toLocaleString('es-CL')}</span>
+                          </div>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] text-slate-500">
+                              Anterior: {prev === null ? '—' : formatMoneyDisplay(prev, currencyFormat)}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-slate-900">
+                              Nuevo: {formatMoneyDisplay(next, currencyFormat)}
+                            </span>
+                          </div>
+                          {(entry.invoice_number || entry.reason) && (
+                            <div className="mt-1 text-[11px] text-slate-600">
+                              {entry.source === 'PURCHASE' && entry.purchase_id && purchaseRef ? (
+                                <>
+                                  Actualizado por compra{' '}
+                                  <a
+                                    href={`/admin/compras/historial?purchase_id=${entry.purchase_id}`}
+                                    className="text-fuchsia-700 underline"
+                                  >
+                                    {purchaseRef}
+                                  </a>
+                                </>
+                              ) : null}
+                              {entry.reason && !(entry.purchase_id && purchaseRef) ? entry.reason : null}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
         )}
 
-        {isEdit && (
-          <aside
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              height: '100%',
-              width: 'min(560px, 100%)',
-              borderLeft: '1px solid var(--a-border)',
-              background: 'var(--a-bg-1)',
-              transform: costDrawerOpen ? 'translateX(0)' : 'translateX(102%)',
-              transition: 'transform .22s ease',
-              zIndex: 21,
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div className="admin-modal-header" style={{ borderBottom: '1px solid var(--a-border)' }}>
-              <span className="admin-modal-title">Historial de costos</span>
-              <button className="admin-btn-icon" onClick={() => setCostDrawerOpen(false)}><X size={16} /></button>
-            </div>
-            <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--a-text-3)', borderBottom: '1px solid var(--a-border)' }}>
-              Registros más recientes primero
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--a-bg-2)' }}>
-              {loadingCostHistory ? (
-                <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--a-text-3)' }}>
-                  Cargando historial...
-                </div>
-              ) : costHistory.length === 0 ? (
-                <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--a-text-3)' }}>
-                  Sin historial de costos registrado.
-                </div>
-              ) : (
-                <div>
-                  {costHistory.map(entry => {
-                    const prev = entry.previous_cost === null ? null : Number(entry.previous_cost)
-                    const next = Number(entry.new_cost)
-                    const purchaseRef = entry.invoice_number || entry.purchase_id
-                    return (
-                      <div key={entry.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--a-border)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--a-text-1)' }}>{sourceLabel(entry.source)}</span>
-                            {actualEntryId === entry.id && (
-                              <span className="admin-badge admin-badge-success" style={{ fontSize: 10 }}>
-                                ACTUAL
-                              </span>
-                            )}
-                          </span>
-                          <span style={{ fontSize: 11, color: 'var(--a-text-3)' }}>{new Date(entry.created_at).toLocaleString('es-CL')}</span>
-                        </div>
-                        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                          <span style={{ fontSize: 11, color: 'var(--a-text-3)', fontFamily: 'var(--a-font-mono)' }}>
-                            Anterior: {prev === null ? '—' : formatMoneyDisplay(prev, currencyFormat)}
-                          </span>
-                          <span style={{ fontSize: 12, color: 'var(--a-text-1)', fontFamily: 'var(--a-font-mono)', fontWeight: 700 }}>
-                            Nuevo: {formatMoneyDisplay(next, currencyFormat)}
-                          </span>
-                        </div>
-                        {(entry.invoice_number || entry.reason) && (
-                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--a-text-2)' }}>
-                            {entry.source === 'PURCHASE' && entry.purchase_id && purchaseRef ? (
-                              <>
-                                Actualizado por compra{' '}
-                                <a
-                                  href={`/admin/compras/historial?purchase_id=${entry.purchase_id}`}
-                                  style={{ color: 'var(--a-accent)', textDecoration: 'underline' }}
-                                >
-                                  {purchaseRef}
-                                </a>
-                              </>
-                            ) : null}
-                            {entry.reason && !(entry.purchase_id && purchaseRef) ? entry.reason : null}
+        {isEdit && priceDrawerOpen && (
+          <div className="fixed inset-0 z-[330]">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-950/45"
+              onClick={() => setPriceDrawerOpen(false)}
+              aria-label="Cerrar historial de precios de venta"
+            />
+
+            <aside className="absolute right-0 top-0 flex h-full w-[min(560px,100vw)] flex-col border-l border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <span className="text-base font-semibold text-slate-900">Historial de precios de venta</span>
+                <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={() => setPriceDrawerOpen(false)}><X size={16} /></button>
+              </div>
+              <div className="border-b border-slate-200 px-3 py-2 text-[11px] text-slate-500">
+                Registros más recientes primero
+              </div>
+              <div className="flex-1 overflow-y-auto bg-slate-50">
+                {loadingPriceHistory ? (
+                  <div className="px-3 py-3 text-xs text-slate-500">
+                    Cargando historial...
+                  </div>
+                ) : priceHistory.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-slate-500">
+                    Sin historial de precios registrado.
+                  </div>
+                ) : (
+                  <div>
+                    {priceHistory.map(entry => {
+                      const prev = entry.previous_price === null ? null : Number(entry.previous_price)
+                      const next = Number(entry.new_price)
+                      const purchaseRef = entry.invoice_number || entry.purchase_id
+                      return (
+                        <div key={entry.id} className="border-b border-slate-200 bg-white px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-800">{sourceLabel(entry.source)}</span>
+                              {actualPriceEntryId === entry.id && (
+                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  ACTUAL
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-slate-500">{new Date(entry.created_at).toLocaleString('es-CL')}</span>
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </aside>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] text-slate-500">
+                              Anterior: {prev === null ? '—' : formatMoneyDisplay(prev, currencyFormat)}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-slate-900">
+                              Nuevo: {formatMoneyDisplay(next, currencyFormat)}
+                            </span>
+                          </div>
+                          {(entry.invoice_number || entry.reason) && (
+                            <div className="mt-1 text-[11px] text-slate-600">
+                              {entry.source === 'PURCHASE' && entry.purchase_id && purchaseRef ? (
+                                <>
+                                  Actualizado por compra{' '}
+                                  <a
+                                    href={`/admin/compras/historial?purchase_id=${entry.purchase_id}`}
+                                    className="text-fuchsia-700 underline"
+                                  >
+                                    {purchaseRef}
+                                  </a>
+                                </>
+                              ) : null}
+                              {entry.reason && !(entry.purchase_id && purchaseRef) ? entry.reason : null}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
         )}
       </div>
     </div>
@@ -854,13 +939,13 @@ function StockModal({ product, onClose, onSaved }: {
     : product.stock
 
   return (
-    <div className="admin-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="admin-modal" style={{ maxWidth: 380 }}>
-        <div className="admin-modal-header">
-          <span className="admin-modal-title">Ajustar Stock</span>
-          <button className="admin-btn-icon" onClick={onClose}><X size={16} /></button>
+    <div className="fixed inset-0 z-[320] flex items-center justify-center bg-slate-950/40 p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-[380px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <span className="text-base font-semibold text-slate-900">Ajustar Stock</span>
+          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={onClose}><X size={16} /></button>
         </div>
-        <div className="admin-modal-body">
+        <div className="space-y-4 px-4 py-3">
           <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--a-bg-2)', borderRadius: 'var(--a-radius)', fontFamily: 'var(--a-font-mono)', fontSize: 12 }}>
             <div style={{ color: 'var(--a-text-3)' }}>Producto</div>
             <div style={{ fontWeight: 600, color: 'var(--a-text-1)', marginTop: 2 }}>{product.name}</div>
@@ -869,16 +954,20 @@ function StockModal({ product, onClose, onSaved }: {
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {(['add', 'set'] as const).map(t => (
-              <button key={t} className={`admin-btn admin-btn-sm ${type === t ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
+              <button key={t} className={`inline-flex h-9 flex-1 items-center justify-center rounded-lg border px-3 text-sm font-medium transition ${
+                type === t
+                  ? 'border-fuchsia-600 bg-fuchsia-600 text-white hover:bg-fuchsia-700'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
                 onClick={() => setType(t)} style={{ flex: 1 }}>
                 {t === 'add' ? '+ Agregar / quitar' : 'Establecer valor'}
               </button>
             ))}
           </div>
 
-          <div className="admin-form-field">
-            <label className="admin-label">{type === 'add' ? 'Cantidad (usa negativo para restar)' : 'Nuevo stock'}</label>
-            <input type="number" className="admin-input mono" value={qty} onChange={e => setQty(e.target.value)}
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{type === 'add' ? 'Cantidad (usa negativo para restar)' : 'Nuevo stock'}</label>
+            <input type="number" className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={qty} onChange={e => setQty(e.target.value)}
               placeholder={type === 'add' ? 'Ej: 10 o -5' : 'Ej: 50'} autoFocus />
           </div>
 
@@ -892,10 +981,10 @@ function StockModal({ product, onClose, onSaved }: {
             </div>
           )}
         </div>
-        <div className="admin-modal-footer">
-          <button className="admin-btn admin-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving || qty === ''}>
-            {saving ? <span className="admin-spinner" /> : 'Actualizar Stock'}
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
+          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={onClose}>Cancelar</button>
+          <button className="inline-flex h-10 items-center rounded-lg bg-fuchsia-600 px-4 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60" onClick={handleSave} disabled={saving || qty === ''}>
+            {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : 'Actualizar Stock'}
           </button>
         </div>
       </div>
@@ -1123,45 +1212,44 @@ export default function ProductosPage() {
   return (
     <>
       {/* Header */}
-      <div className="admin-page-header">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="admin-page-title">Gestión de <span>Productos</span></h1>
-          <p className="admin-page-subtitle">{products.length} producto{products.length !== 1 ? 's' : ''} · Haz click en una fila para editar</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Gestión de <span className="text-fuchsia-700">Productos</span></h1>
+          <p className="mt-1 text-sm text-slate-600">{products.length} producto{products.length !== 1 ? 's' : ''} · Haz click en una fila para editar</p>
         </div>
-        <button className="admin-btn admin-btn-primary admin-btn-lg" onClick={openCreate}>
+        <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-fuchsia-600 px-4 text-sm font-semibold text-white transition hover:bg-fuchsia-700" onClick={openCreate}>
           <Plus size={16} /> Nuevo Producto
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="admin-panel">
-        <div className="admin-panel-body" style={{ padding: '14px 20px' }}>
-          <div className="prod-filters-top">
+      <div className="mb-4 rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Buscador */}
-            <div style={{ position: 'relative', minWidth: 180 }}>
-              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--a-text-3)', pointerEvents: 'none' }} />
+            <div className="relative min-w-[180px] flex-1">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                className="admin-input admin-input-sm"
-                style={{ paddingLeft: 30 }}
+                className="h-9 w-full rounded-lg border border-slate-200 pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
                 placeholder="Buscar nombre, SKU o código…"
                 value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1) }}
               />
             </div>
 
-            <button className="admin-btn-icon" onClick={fetchProducts} title="Actualizar">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" onClick={fetchProducts} title="Actualizar">
               <RefreshCw size={13} />
             </button>
           </div>
 
-          <div className="prod-filters-bottom">
+          <div className="flex flex-wrap items-end gap-3">
             {/* Categoría */}
-            <div className="prod-filter-group">
-              <span style={{ fontSize: 10, color: 'var(--a-text-3)', fontWeight: 600, letterSpacing: 0.3 }}>
+            <div className="min-w-[200px] space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Filtrar por categoría
               </span>
               <select
-                className="admin-select prod-filter-select"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
                 value={filterCat}
                 onChange={e => { setFilterCat(e.target.value); setPage(1) }}
               >
@@ -1171,12 +1259,12 @@ export default function ProductosPage() {
             </div>
 
             {/* Modo / Estado */}
-            <div className="prod-filter-group">
-              <span style={{ fontSize: 10, color: 'var(--a-text-3)', fontWeight: 600, letterSpacing: 0.3 }}>
+            <div className="min-w-[220px] space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Filtrar por estado o condición
               </span>
               <select
-                className="admin-select prod-filter-select"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
                 value={filterMode}
                 onChange={e => { setFilterMode(e.target.value as typeof filterMode); setPage(1) }}
               >
@@ -1189,8 +1277,8 @@ export default function ProductosPage() {
             </div>
 
             {/* Column selector */}
-            <div className="prod-filter-group" style={{ marginLeft: 'auto' }}>
-              <span style={{ fontSize: 10, color: 'var(--a-text-3)', fontWeight: 600, letterSpacing: 0.3 }}>
+            <div className="ml-auto min-w-[180px] space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 Personalizar tabla
               </span>
               <ColSelector visible={visibleCols} onChange={updateCols} />
@@ -1200,62 +1288,62 @@ export default function ProductosPage() {
       </div>
 
       {/* Tabla */}
-      <div className="admin-panel">
-        <div className="admin-panel-header">
-          <span className="admin-panel-title">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <span className="text-sm font-semibold text-slate-900">
             Productos
-            {sorted.length > 0 && <span style={{ marginLeft: 8, color: 'var(--a-accent)', fontSize: 10 }}>{sorted.length} resultados</span>}
+            {sorted.length > 0 && <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-fuchsia-700">{sorted.length} resultados</span>}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--a-text-3)' }}>
+          <span className="text-xs text-slate-500">
             Selección: <strong>Shift + click</strong> o <strong>Ctrl/Cmd + click</strong>
           </span>
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-            <span className="admin-spinner" style={{ width: 24, height: 24, borderWidth: 3 }} />
+          <div className="flex justify-center p-12">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-fuchsia-600" />
           </div>
         ) : sorted.length === 0 ? (
-          <div className="admin-empty">
-            <Package size={36} className="admin-empty-icon" />
-            <p className="admin-empty-text">No hay productos{search ? ` para "${search}"` : ''}</p>
-            <button className="admin-btn admin-btn-primary" style={{ marginTop: 16 }} onClick={openCreate}>
+          <div className="flex flex-col items-center justify-center gap-2 p-12 text-center">
+            <Package size={36} className="text-slate-300" />
+            <p className="text-sm text-slate-600">No hay productos{search ? ` para "${search}"` : ''}</p>
+            <button className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-fuchsia-600 px-3 text-sm font-semibold text-white transition hover:bg-fuchsia-700" onClick={openCreate}>
               <Plus size={14} /> Crear primer producto
             </button>
           </div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   {/* Nombre always visible */}
-                  <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('name')}>
+                  <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort('name')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>Nombre <SortIcon k="name" /></span>
                   </th>
                   {show('sku') && (
-                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('sku')}>
+                    <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort('sku')}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>SKU <SortIcon k="sku" /></span>
                     </th>
                   )}
-                  {show('category') && <th>Categoría</th>}
+                  {show('category') && <th className="px-4 py-2.5">Categoría</th>}
                   {show('venta_bruto') && (
-                    <th style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }} onClick={() => toggleSort('base_price')}>
+                    <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort('base_price')}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>Venta Bruto <SortIcon k="base_price" /></span>
                     </th>
                   )}
-                  {show('venta_neto') && <th style={{ textAlign: 'right' }}>Venta Neto</th>}
-                  {show('costo_bruto') && <th style={{ textAlign: 'right' }}>Costo Bruto</th>}
-                  {show('costo_neto') && <th style={{ textAlign: 'right' }}>Costo Neto</th>}
+                  {show('venta_neto') && <th className="px-4 py-2.5 text-right">Venta Neto</th>}
+                  {show('costo_bruto') && <th className="px-4 py-2.5 text-right">Costo Bruto</th>}
+                  {show('costo_neto') && <th className="px-4 py-2.5 text-right">Costo Neto</th>}
                   {show('stock') && (
-                    <th style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }} onClick={() => toggleSort('stock')}>
+                    <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort('stock')}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>Stock <SortIcon k="stock" /></span>
                     </th>
                   )}
-                  {show('ecommerce') && <th style={{ textAlign: 'center' }}>Ecommerce</th>}
-                  {show('estado') && <th style={{ textAlign: 'center' }}>Estado</th>}
+                  {show('ecommerce') && <th className="px-4 py-2.5 text-center">Ecommerce</th>}
+                  {show('estado') && <th className="px-4 py-2.5 text-center">Estado</th>}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {paginated.map((p, rowIndex) => {
                   const bruto = parseFloat(p.base_price)
                   const neto = Math.round(bruto / 1.19)
@@ -1267,83 +1355,80 @@ export default function ProductosPage() {
                   return (
                     <tr
                       key={p.id}
-                      style={{
-                        cursor: 'pointer',
-                        background: selectedIds.includes(p.id) ? 'var(--a-accent-dim)' : undefined,
-                      }}
+                      className={`cursor-pointer transition hover:bg-slate-50 ${selectedIds.includes(p.id) ? 'bg-fuchsia-50' : ''}`}
                       onClick={(e) => handleRowClick(e, p, rowIndex)}
                     >
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--a-text-1)' }}>{p.name}</div>
-                        {p.description && <div style={{ fontSize: 11, color: 'var(--a-text-3)', marginTop: 1, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>}
+                      <td className="px-4 py-2.5">
+                        <div className="font-semibold text-slate-900">{p.name}</div>
+                        {p.description && <div className="mt-0.5 max-w-[200px] truncate text-xs text-slate-500">{p.description}</div>}
                       </td>
-                      {show('sku') && <td><span className="admin-mono">{p.sku}</span></td>}
+                      {show('sku') && <td className="px-4 py-2.5"><span className="font-mono text-xs text-slate-700">{p.sku}</span></td>}
                       {show('category') && (
-                        <td>
+                        <td className="px-4 py-2.5">
                           {catIds.length > 0
-                            ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                            ? <div className="flex flex-wrap gap-1">
                                 {catIds.map(id => catMap[id]
-                                  ? <span key={id} className="admin-badge admin-badge-warning"><Tag size={9} /> {catMap[id]}</span>
+                                  ? <span key={id} className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"><Tag size={9} /> {catMap[id]}</span>
                                   : null
                                 )}
                               </div>
-                            : <span style={{ color: 'var(--a-text-3)', fontSize: 11 }}>—</span>
+                            : <span className="text-xs text-slate-400">—</span>
                           }
                         </td>
                       )}
                       {show('venta_bruto') && (
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--a-font-mono)', fontWeight: 600, color: 'var(--a-text-1)' }}>
-                          {fmt(bruto)}
+                        <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">
+                          {formatMoneyDisplay(bruto, currencyFormat)}
                         </td>
                       )}
                       {show('venta_neto') && (
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--a-font-mono)', fontSize: 12, color: 'var(--a-text-2)' }}>
-                          {fmt(neto)}
+                        <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600">
+                          {formatMoneyDisplay(neto, currencyFormat)}
                         </td>
                       )}
                       {show('costo_bruto') && (
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--a-font-mono)', fontSize: 12, color: 'var(--a-text-2)' }}>
-                          {costoBruto ? fmt(costoBruto) : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
+                        <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600">
+                          {costoBruto ? formatMoneyDisplay(costoBruto, currencyFormat) : <span className="text-slate-400">—</span>}
                         </td>
                       )}
                       {show('costo_neto') && (
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--a-font-mono)', fontSize: 12, color: 'var(--a-text-2)' }}>
-                          {costoNeto ? fmt(costoNeto) : <span style={{ color: 'var(--a-text-3)' }}>—</span>}
+                        <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-600">
+                          {costoNeto ? formatMoneyDisplay(costoNeto, currencyFormat) : <span className="text-slate-400">—</span>}
                         </td>
                       )}
                       {show('stock') && (
-                        <td style={{ textAlign: 'right' }}>
+                        <td className="px-4 py-2.5 text-right">
                           {p.track_stock ? (
-                            <span style={{ fontFamily: 'var(--a-font-mono)', fontWeight: 700,
-                              color: outStock ? 'var(--a-accent)' : lowStock ? 'var(--a-accent)' : 'var(--a-text-1)' }}>
+                            <span className={`font-mono font-bold ${outStock || lowStock ? 'text-fuchsia-700' : 'text-slate-900'}`}>
                               {p.stock}
-                              {outStock && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--a-accent)', letterSpacing: 1 }}>SIN STOCK</span>}
-                              {lowStock && !outStock && <span style={{ fontSize: 9, marginLeft: 4, color: 'var(--a-accent)', letterSpacing: 1 }}>BAJO</span>}
+                              {outStock && <span className="ml-1 text-[9px] tracking-wider text-fuchsia-700">SIN STOCK</span>}
+                              {lowStock && !outStock && <span className="ml-1 text-[9px] tracking-wider text-fuchsia-700">BAJO</span>}
                             </span>
                           ) : (
-                            <span style={{ fontSize: 11, color: 'var(--a-text-3)' }}>—</span>
+                            <span className="text-xs text-slate-400">—</span>
                           )}
                         </td>
                       )}
                       {show('ecommerce') && (
-                        <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <td className="px-4 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                           <button
-                            className="admin-btn-icon"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
                             title={isOnlineVisible(p) ? 'Visible — click para ocultar' : 'Oculto — click para publicar'}
                             onClick={e => { e.stopPropagation(); toggleOnline(p) }}
                           >
                             {isOnlineVisible(p)
-                              ? <Globe size={14} style={{ color: 'var(--a-accent)' }} />
-                              : <EyeOff size={14} style={{ color: 'var(--a-text-3)' }} />
+                              ? <Globe size={14} className="text-fuchsia-700" />
+                              : <EyeOff size={14} className="text-slate-500" />
                             }
                           </button>
                         </td>
                       )}
                       {show('estado') && (
-                        <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <td className="px-4 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                           <button
-                            className={`admin-badge ${p.active ? 'admin-badge-success' : 'admin-badge-danger'}`}
-                            style={{ cursor: 'pointer', border: 'none', background: 'none' }}
+                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                              p.active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+                            }`}
                             title={p.active ? 'Activo — click para desactivar' : 'Inactivo — click para activar'}
                             onClick={e => { e.stopPropagation(); toggleActive(p) }}
                           >
@@ -1361,12 +1446,12 @@ export default function ProductosPage() {
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, padding: '14px 20px', borderTop: '1px solid var(--a-border)' }}>
-            <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Anterior</button>
-            <span style={{ fontFamily: 'var(--a-font-mono)', fontSize: 12, color: 'var(--a-text-2)' }}>
+          <div className="flex items-center justify-center gap-2 border-t border-slate-200 px-4 py-3">
+            <button className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹ Anterior</button>
+            <span className="font-mono text-xs text-slate-600">
               {page} / {totalPages}
             </span>
-            <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Siguiente ›</button>
+            <button className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Siguiente ›</button>
           </div>
         )}
       </div>
@@ -1392,10 +1477,10 @@ export default function ProductosPage() {
           <span style={{ fontSize: 12, color: 'var(--a-text-1)', fontWeight: 600 }}>
             {selectedCount} seleccionada{selectedCount !== 1 ? 's' : ''}
           </span>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={clearSelection}>
+          <button className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50" onClick={clearSelection}>
             Limpiar
           </button>
-          <button className="admin-btn admin-btn-danger admin-btn-sm" onClick={handleBulkDelete}>
+          <button className="inline-flex h-8 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700" onClick={handleBulkDelete}>
             Eliminar
           </button>
         </div>
