@@ -55,7 +55,19 @@ export async function POST(request: NextRequest) {
         })
         .execute()
 
-      // 3. Crear usuario owner
+      // 3. Crear sucursal principal por defecto
+      await trx
+        .insertInto('locations')
+        .values({
+          tenant_id: tenant.id,
+          name: 'Principal',
+          type: 'STORE',
+          is_default: true,
+          active: true,
+        })
+        .execute()
+
+      // 4. Crear usuario owner
       const password_hash = await bcrypt.hash(body.owner_password, 10)
       const owner = await trx
         .insertInto('users')

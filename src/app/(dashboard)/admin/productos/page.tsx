@@ -287,6 +287,44 @@ function ProductModal({
     !form.category_ids.includes(c.id) && c.name.toLowerCase().includes(catSearch.toLowerCase().trim())
   )
 
+  function normalizeFormForDirtyCheck(currentForm: typeof form) {
+    return {
+      ...currentForm,
+      name: currentForm.name.trim(),
+      description: currentForm.description.trim(),
+      sku: currentForm.sku.trim(),
+      barcode: currentForm.barcode.trim(),
+      base_price: currentForm.base_price.trim(),
+      cost: currentForm.cost.trim(),
+      stock: currentForm.stock.trim(),
+      low_stock_alert: currentForm.low_stock_alert.trim(),
+      ecommerce_images: [...currentForm.ecommerce_images],
+      category_ids: [...currentForm.category_ids],
+    }
+  }
+  const initialFormRef = useRef(JSON.stringify(normalizeFormForDirtyCheck(form)))
+
+  function hasUnsavedChanges() {
+    const initial = JSON.parse(initialFormRef.current)
+    const current = normalizeFormForDirtyCheck(form)
+    return JSON.stringify(initial) !== JSON.stringify(current)
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const confirmed = window.confirm('Tienes cambios sin guardar. ¿Salir y descartar cambios?')
+      if (!confirmed) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    initialFormRef.current = JSON.stringify(normalizeFormForDirtyCheck(form))
+    // Solo se recalcula al abrir modal o cambiar producto de origen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, isEdit])
+
   function set(field: string, value: unknown) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => { const n = { ...e }; delete n[field]; return n })
@@ -454,11 +492,11 @@ function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/40 p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/40 p-4">
       <div className="relative w-[min(980px,96vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
           <span className="text-base font-semibold text-slate-900">{isEdit ? 'Editar Producto' : 'Nuevo Producto'}</span>
-          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={onClose}><X size={16} /></button>
+          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={requestClose}><X size={16} /></button>
         </div>
 
         <div className="max-h-[78vh] space-y-4 overflow-y-auto px-5 py-4">
@@ -738,7 +776,7 @@ function ProductModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={onClose}>Cancelar</button>
+          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={requestClose}>Cancelar</button>
           <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-fuchsia-600 px-4 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60" onClick={handleSave} disabled={saving}>
             {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <CheckCircle2 size={15} />}
             {saving ? 'Guardando…' : isEdit ? 'Guardar Cambios' : 'Crear Producto'}
@@ -1358,9 +1396,10 @@ export default function ProductosPage() {
                       className={`cursor-pointer transition hover:bg-slate-50 ${selectedIds.includes(p.id) ? 'bg-fuchsia-50' : ''}`}
                       onClick={(e) => handleRowClick(e, p, rowIndex)}
                     >
-                      <td className="px-4 py-2.5">
-                        <div className="font-semibold text-slate-900">{p.name}</div>
-                        {p.description && <div className="mt-0.5 max-w-[200px] truncate text-xs text-slate-500">{p.description}</div>}
+                      <td className="max-w-[320px] px-4 py-2.5">
+                        <div className="truncate whitespace-nowrap font-semibold text-slate-900" title={p.name}>
+                          {p.name}
+                        </div>
                       </td>
                       {show('sku') && <td className="px-4 py-2.5"><span className="font-mono text-xs text-slate-700">{p.sku}</span></td>}
                       {show('category') && (
