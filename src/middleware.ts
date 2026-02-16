@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 import { verifySuperadminToken } from '@/lib/superadmin-auth'
 
 export async function middleware(request: NextRequest) {
@@ -36,10 +37,16 @@ export async function middleware(request: NextRequest) {
     tenantSlug = hostParts[0]
   }
 
-  // 2. /login/[slug] path — extract slug but don't treat as store path
+  // 2. /login/[slug] path — extract slug but don't treat as store path (legacy)
   const loginSlugMatch = pathname.match(/^\/login\/([^/]+)/)
   if (loginSlugMatch) {
     tenantSlug = loginSlugMatch[1]
+  }
+
+  // 2b. /[slug]/login path — new store-specific login URL
+  const tenantLoginMatch = pathname.match(/^\/([^/]+)\/login$/)
+  if (tenantLoginMatch) {
+    tenantSlug = tenantLoginMatch[1]
   }
 
   // 3. /store/[slug] path
@@ -54,7 +61,13 @@ export async function middleware(request: NextRequest) {
     if (cookieSlug) tenantSlug = cookieSlug
   }
 
-  // 5. Default fallback for development
+  // 5. JWT fallback — uses tenantSlug stored in NextAuth session token
+  if (!tenantSlug) {
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    if (token?.tenantSlug) tenantSlug = token.tenantSlug as string
+  }
+
+  // 6. Default fallback for development
   if (!tenantSlug) {
     tenantSlug = 'demo-store'
   }

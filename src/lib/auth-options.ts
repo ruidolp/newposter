@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { authenticateUser } from '@/lib/auth'
+import { db } from '@/database/db'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -21,12 +22,21 @@ export const authOptions: NextAuthOptions = {
           credentials.tenantId
         )
         if (!user) return null
+
+        // Fetch tenant slug to store in JWT for middleware resolution
+        const tenant = await db
+          .selectFrom('tenants')
+          .select('slug')
+          .where('id', '=', credentials.tenantId)
+          .executeTakeFirst()
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
           tenantId: user.tenantId,
+          tenantSlug: tenant?.slug ?? '',
         }
       },
     }),
@@ -37,6 +47,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = (user as any).role
         token.tenantId = (user as any).tenantId
+        token.tenantSlug = (user as any).tenantSlug
       }
       return token
     },

@@ -154,7 +154,7 @@ export default function NuevaEmpresaPage() {
                   className={`${inputCls} font-mono`}
                 />
                 <p className="text-xs text-slate-500">
-                  URL de acceso: <code className="text-violet-400">/login/{form.slug || 'slug'}</code>
+                  URL de acceso: <code className="text-violet-400">/{form.slug || 'slug'}/login</code>
                 </p>
               </div>
 

@@ -213,7 +213,7 @@ export default function SuperadminDashboardClient({ adminName }: { adminName: st
                       </td>
                       <td className="px-4 py-3 text-right">
                         <a
-                          href={`/login/${t.slug}`}
+                          href={`/${t.slug}/login`}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Ir al login de ${t.name}`}

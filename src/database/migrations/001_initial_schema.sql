@@ -228,3 +228,12 @@ $$ language 'plpgsql';
 
 CREATE TRIGGER track_stock_changes AFTER UPDATE ON products
   FOR EACH ROW EXECUTE FUNCTION create_stock_movement();
+
+-- Migration tracking
+CREATE TABLE migrations (
+  version INTEGER PRIMARY KEY,
+  filename VARCHAR(255) NOT NULL,
+  applied_at TIMESTAMP DEFAULT NOW()
+);
+
+INSERT INTO migrations (version, filename) VALUES (1, '001_initial_schema.sql');

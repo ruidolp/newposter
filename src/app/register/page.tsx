@@ -62,7 +62,7 @@ export default function RegisterPage() {
                 throw new Error(data.error || 'Error al registrar la empresa')
             }
 
-            router.push(`/login/${form.slug}`)
+            router.push(`/${form.slug}/login`)
         } catch (e: unknown) {
             setError((e as Error).message)
             setSaving(false)
@@ -161,18 +161,21 @@ export default function RegisterPage() {
                                 <label htmlFor="company-slug" className={labelCls}>URL de tu tienda</label>
                                 <div className="relative flex rounded-xl shadow-sm">
                                     <span className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-gray-200 bg-gray-100 text-gray-500 text-sm font-medium">
-                                        posfer.com/login/
+                                        posfer.com/
                                     </span>
                                     <input
                                         id="company-slug"
                                         name="company-slug"
                                         type="text"
                                         required
-                                        className={`${inputCls} rounded-l-none pl-3 font-medium text-fuchsia-700`}
+                                        className={`${inputCls} rounded-none pl-3 font-medium text-fuchsia-700`}
                                         placeholder="mi-tienda"
                                         value={form.slug}
                                         onChange={(e) => { setSlugManual(true); setField('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) }}
                                     />
+                                    <span className="inline-flex items-center px-4 rounded-r-xl border border-l-0 border-gray-200 bg-gray-100 text-gray-500 text-sm font-medium">
+                                        /login
+                                    </span>
                                 </div>
                             </div>
 

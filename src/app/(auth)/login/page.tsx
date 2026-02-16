@@ -113,7 +113,7 @@ export default function LoginPage() {
                   className={`${inputCls} font-mono`}
                 />
                 <p className="text-xs text-slate-400">
-                  Ejemplo: si tu URL es <code className="text-fuchsia-600">/login/ferreteria-el-clavo</code>, ingresa <code className="text-fuchsia-600">ferreteria-el-clavo</code>
+                  Ejemplo: si tu URL es <code className="text-fuchsia-600">/ferreteria-el-clavo/login</code>, ingresa <code className="text-fuchsia-600">ferreteria-el-clavo</code>
                 </p>
               </div>
 
