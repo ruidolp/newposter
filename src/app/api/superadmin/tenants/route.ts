@@ -105,6 +105,18 @@ export async function POST(request: NextRequest) {
         .returning(['id', 'name', 'email', 'role'])
         .executeTakeFirstOrThrow()
 
+      // 4. Crear sucursal principal por defecto
+      await trx
+        .insertInto('locations')
+        .values({
+          tenant_id: tenant.id,
+          name: 'Principal',
+          type: 'STORE',
+          is_default: true,
+          active: true,
+        })
+        .execute()
+
       return { tenant, owner }
     })
 

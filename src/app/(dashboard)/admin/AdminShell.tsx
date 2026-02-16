@@ -1,17 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   BriefcaseBusiness,
   Building2,
   ChevronDown,
+  ChevronUp,
   ClipboardList,
   ExternalLink,
   FileText,
   Globe,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -32,6 +34,7 @@ import {
 
 interface AdminShellProps {
   user: { name: string; role: string }
+  storeName?: string
   children: React.ReactNode
 }
 
@@ -116,8 +119,20 @@ const NAV_SECTIONS: NavSection[] = [
 
 const NAV: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items)
 
-export default function AdminShell({ user, children }: AdminShellProps) {
+export default function AdminShell({ user, storeName, children }: AdminShellProps) {
   const pathname = usePathname()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Auto-expand parent if a child route is active
   const [expanded, setExpanded] = useState<string[]>(() =>
@@ -161,9 +176,11 @@ export default function AdminShell({ user, children }: AdminShellProps) {
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-fuchsia-600 to-rose-500 text-white shadow-md shadow-fuchsia-200">
               <Store size={18} aria-hidden="true" />
             </div>
-            <div>
-              <div className="text-xl font-black tracking-tight">
-                <span className="bg-gradient-to-r from-fuchsia-600 to-rose-600 bg-clip-text text-transparent">POSFER</span>
+            <div className="min-w-0">
+              <div className="truncate text-xl font-black tracking-tight">
+                <span className="bg-gradient-to-r from-fuchsia-600 to-rose-600 bg-clip-text text-transparent uppercase">
+                  {storeName || 'POSFER'}
+                </span>
               </div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Panel Administrativo</p>
             </div>
@@ -259,24 +276,45 @@ export default function AdminShell({ user, children }: AdminShellProps) {
           </div>
         </nav>
 
-        <div className="border-t border-slate-200 px-3 py-3">
-          <div className="mb-2 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
-              <p className="truncate text-xs uppercase tracking-wide text-slate-500">{user.role}</p>
-            </div>
+        <div className="border-t border-slate-200 px-3 py-3" ref={userMenuRef}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setUserMenuOpen((o) => !o)}
+              className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            >
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
+                <p className="truncate text-xs uppercase tracking-wide text-slate-500">{user.role}</p>
+              </div>
+              {userMenuOpen ? <ChevronDown size={14} className="shrink-0 text-slate-400" /> : <ChevronUp size={14} className="shrink-0 text-slate-400" />}
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                <Link
+                  href="/admin/perfil"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+                >
+                  <KeyRound size={14} className="text-slate-400" aria-hidden="true" />
+                  Cambiar contraseña
+                </Link>
+                <div className="mx-2 border-t border-slate-100" />
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+                >
+                  <LogOut size={14} aria-hidden="true" />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="flex w-full items-center justify-start gap-2 rounded-md px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
-          >
-            <LogOut size={14} aria-hidden="true" />
-            Cerrar sesión
-          </button>
         </div>
       </aside>
 

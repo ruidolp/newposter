@@ -7,10 +7,12 @@ import {
   CheckCircle2,
   DollarSign,
   Globe,
+  ImagePlus,
   RefreshCw,
   Save,
   Store,
   ShoppingCart,
+  X,
 } from 'lucide-react'
 
 interface CurrencyFormat {
@@ -23,6 +25,7 @@ interface CurrencyFormat {
 
 interface Settings {
   store_name: string
+  slug: string
   language: string
   currency: string
   timezone: string
@@ -90,6 +93,7 @@ const TIMEZONES = [
 
 const DEFAULT_SETTINGS: Settings = {
   store_name: '',
+  slug: '',
   language: 'es',
   currency: 'CLP',
   timezone: 'America/Santiago',
@@ -196,6 +200,8 @@ function CurrencyPreview({ fmt }: { fmt: CurrencyFormat }) {
 
 export default function ConfiguracionPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -214,6 +220,7 @@ export default function ConfiguracionPage() {
       const meta = (data.settings?.metadata ?? {}) as Record<string, unknown>
       setSettings({
         store_name: data.tenant?.name ?? '',
+        slug: data.tenant?.slug ?? '',
         language: data.settings?.language ?? 'es',
         currency: data.settings?.currency ?? 'CLP',
         timezone: data.settings?.timezone ?? 'America/Santiago',
@@ -333,6 +340,58 @@ export default function ConfiguracionPage() {
       ) : (
         <>
           <Section icon={Store} title="Tienda">
+            {/* Logo — span completo */}
+            <div className="md:col-span-2">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">Logo</p>
+              <div className="flex items-center gap-3">
+                {/* Preview */}
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-slate-300 bg-slate-50">
+                  {logoPreview ? (
+                    <>
+                      <img src={logoPreview} alt="Logo preview" className="h-full w-full object-contain p-1" />
+                      <button
+                        type="button"
+                        onClick={() => { setLogoPreview(null); setLogoFile(null) }}
+                        className="absolute right-0.5 top-0.5 rounded-full bg-white p-0.5 shadow hover:bg-red-50 text-slate-400 hover:text-red-600 transition"
+                        aria-label="Quitar logo"
+                      >
+                        <X size={11} />
+                      </button>
+                    </>
+                  ) : (
+                    <Store size={22} className="text-slate-300" aria-hidden="true" />
+                  )}
+                </div>
+                {/* Upload */}
+                <label
+                  htmlFor="logo-upload"
+                  className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-fuchsia-300 bg-fuchsia-50 px-3 py-2.5 transition hover:bg-fuchsia-100"
+                >
+                  <ImagePlus size={16} className="shrink-0 text-fuchsia-500" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-fuchsia-700">
+                      {logoFile ? logoFile.name : 'Subir logo'}
+                    </p>
+                    <p className="text-xs text-slate-500">PNG, JPG, SVG · Máx. 2 MB</p>
+                  </div>
+                  <input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setLogoFile(file)
+                      const reader = new FileReader()
+                      reader.onload = (ev) => setLogoPreview(ev.target?.result as string)
+                      reader.readAsDataURL(file)
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
             <Field id="store_name" label="Nombre de la tienda">
               <input
                 id="store_name"
@@ -344,6 +403,22 @@ export default function ConfiguracionPage() {
                 autoComplete="off"
               />
             </Field>
+
+            <Field id="slug" label="Slug (identificador)">
+              <div className="relative">
+                <input
+                  id="slug"
+                  name="slug"
+                  value={settings.slug}
+                  readOnly
+                  className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 pr-24 text-sm text-slate-500 outline-none cursor-default select-all"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Solo lectura
+                </span>
+              </div>
+            </Field>
+
             <Field id="country" label="País">
               <Select
                 id="country"

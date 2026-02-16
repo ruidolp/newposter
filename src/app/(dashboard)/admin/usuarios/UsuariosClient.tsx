@@ -597,6 +597,11 @@ export default function UsuariosClient({
     try {
       const res = await fetch(`/api/users?${showInactive ? 'all=true' : ''}`)
       const data = await res.json()
+      if (!res.ok) {
+        toast('error', data.error ?? 'Error al cargar usuarios')
+        setUsers([])
+        return
+      }
       setUsers(data.users ?? [])
     } catch {
       toast('error', 'Error al cargar usuarios')

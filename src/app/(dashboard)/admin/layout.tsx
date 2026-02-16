@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
+import { getCurrentTenant } from '@/lib/tenant'
 import './admin.css'
 import AdminShell from './AdminShell'
 
@@ -18,8 +19,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect(role === 'EMPLOYEE' ? '/rrhh/dashboard' : '/pos')
   }
 
+  const tenant = await getCurrentTenant()
+
   return (
-    <AdminShell user={{ name: session.user?.name ?? '', role }}>
+    <AdminShell user={{ name: session.user?.name ?? '', role }} storeName={tenant?.name ?? ''}>
       {children}
     </AdminShell>
   )
