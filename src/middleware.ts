@@ -33,7 +33,9 @@ export async function middleware(request: NextRequest) {
 
   // 1. Subdomain (e.g. demo-store.localhost:3000)
   const hostParts = hostname.split('.')
-  if (hostParts.length > 1 && hostParts[0] !== 'www' && hostParts[0] !== 'localhost') {
+  const ignoredHosts = ['vercel', 'netlify', 'railway', 'render', 'fly', 'herokuapp']
+  const isHostingDomain = ignoredHosts.some((h) => hostname.includes(`.${h}.`))
+  if (hostParts.length > 1 && hostParts[0] !== 'www' && hostParts[0] !== 'localhost' && !isHostingDomain) {
     tenantSlug = hostParts[0]
   }
 
