@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth-options'
 import { db } from '@/database/db'
 import { requireTenant } from '@/lib/tenant'
-import { sql } from 'kysely'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET })
-    if (!token) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const tenant = await requireTenant()
 
