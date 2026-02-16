@@ -144,6 +144,8 @@ export async function PATCH(
         : null
     }
     if (processedData.stock !== undefined) updateData.stock = processedData.stock
+    if (processedData.brand_id !== undefined) updateData.brand_id = processedData.brand_id
+    else if (Object.prototype.hasOwnProperty.call(body, 'brand_id')) updateData.brand_id = body.brand_id || null
     if (processedData.category_id !== undefined) updateData.category_id = processedData.category_id
     if (processedData.barcode !== undefined) updateData.barcode = processedData.barcode
     if (processedData.active !== undefined) updateData.active = processedData.active

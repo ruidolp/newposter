@@ -9,6 +9,7 @@ export interface CustomerSnap {
   name: string
   phone: string | null
   email: string | null
+  rut: string | null
 }
 
 interface Props {
@@ -74,6 +75,7 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
   // ── Quick create form ─────────────────────────────────────────────────────
   function QuickCreateForm() {
     const [name, setName] = useState(query)
+    const [rut, setRut] = useState('')
     const [phone, setPhone] = useState('')
     const [email, setEmail] = useState('')
     const [saving, setSaving] = useState(false)
@@ -91,11 +93,16 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
         const res = await fetch('/api/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), phone: phone.trim() || null, email: email.trim() || null }),
+          body: JSON.stringify({
+            name: name.trim(),
+            rut: rut.trim().toUpperCase() || null,
+            phone: phone.trim() || null,
+            email: email.trim() || null,
+          }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? 'Error al crear cliente')
-        pick({ id: data.id, name: data.name, phone: data.phone ?? null, email: data.email ?? null })
+        pick({ id: data.id, name: data.name, rut: data.rut ?? null, phone: data.phone ?? null, email: data.email ?? null })
       } catch (e: unknown) {
         setErr((e as Error).message)
       } finally {
@@ -120,6 +127,19 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
             onChange={(e) => setName(e.target.value)}
             placeholder="Nombre…"
             className="h-8 w-full rounded-lg border border-slate-200 px-2.5 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+          />
+        </div>
+        <div>
+          <label htmlFor="qc-rut" className="sr-only">RUT</label>
+          <input
+            id="qc-rut"
+            name="rut"
+            type="text"
+            autoComplete="off"
+            value={rut}
+            onChange={(e) => setRut(e.target.value)}
+            placeholder="RUT (opcional)…"
+            className="h-8 w-full rounded-lg border border-slate-200 px-2.5 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
           />
         </div>
         <div>
@@ -182,13 +202,12 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
           <div className="flex items-center gap-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-3 py-2">
             <UserCircle2 size={15} className="shrink-0 text-fuchsia-600" aria-hidden="true" />
             <div className="flex-1 min-w-0">
-              <p className="truncate text-xs font-semibold text-fuchsia-800">{selected.name}</p>
-              {selected.phone && (
-                <p className="flex items-center gap-0.5 text-[10px] text-fuchsia-500">
-                  <Phone size={9} aria-hidden="true" />{selected.phone}
-                </p>
-              )}
-            </div>
+                  <p className="truncate text-xs font-semibold text-fuchsia-800">{selected.name}</p>
+                  <p className="flex items-center gap-1 text-[10px] text-fuchsia-500">
+                    {selected.rut ? <span className="font-mono">{selected.rut}</span> : null}
+                    {selected.phone ? <span className="inline-flex items-center gap-0.5"><Phone size={9} aria-hidden="true" />{selected.phone}</span> : null}
+                  </p>
+                </div>
             <button
               type="button"
               onClick={clear}
@@ -205,10 +224,11 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-left text-xs text-slate-400 transition hover:border-fuchsia-300 hover:text-fuchsia-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+          className="flex w-full items-center gap-2.5 rounded-xl border-2 border-fuchsia-200 bg-fuchsia-50/50 px-4 py-3 text-left text-sm font-semibold text-fuchsia-700 transition hover:border-fuchsia-300 hover:bg-fuchsia-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
         >
-          <UserCircle2 size={14} aria-hidden="true" />
-          Agregar cliente (opcional)
+          <UserCircle2 size={16} aria-hidden="true" />
+          Agregar Cliente
+          <span className="text-xs font-medium text-fuchsia-500/90">(Opcional)</span>
         </button>
       )}
 
@@ -225,7 +245,7 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
               spellCheck={false}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre o teléfono…"
+              placeholder="Buscar por nombre, email, RUT o teléfono…"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
             {searching && (
@@ -246,7 +266,9 @@ export default function CustomerSelector({ selected, onSelect }: Props) {
                     <UserCircle2 size={14} className="shrink-0 text-slate-400" aria-hidden="true" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-800">{c.name}</p>
-                      {c.phone && <p className="text-xs text-slate-400">{c.phone}</p>}
+                      <p className="text-xs text-slate-400">
+                        {[c.rut, c.phone, c.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}
+                      </p>
                     </div>
                   </button>
                 </li>

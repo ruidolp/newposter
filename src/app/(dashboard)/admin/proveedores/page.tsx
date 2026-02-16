@@ -1,6 +1,6 @@
 'use client'
 
-import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -114,10 +114,56 @@ function SupplierModal({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const initialRef = useRef(
+    JSON.stringify({
+      name: (supplier?.name ?? '').trim(),
+      rut: (supplier?.rut ?? '').trim(),
+      email: (supplier?.email ?? '').trim(),
+      phone: (supplier?.phone ?? '').trim(),
+      address: (supplier?.address ?? '').trim(),
+      contact_name: (supplier?.contact_name ?? '').trim(),
+      notes: (supplier?.notes ?? '').trim(),
+      active: supplier?.active ?? true,
+    })
+  )
 
   function setField<K extends keyof SupplierFormState>(key: K, value: SupplierFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: form.name.trim(),
+      rut: form.rut.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: form.address.trim(),
+      contact_name: form.contact_name.trim(),
+      notes: form.notes.trim(),
+      active: form.active,
+    })
+    return current !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     if (!form.name.trim()) {
@@ -152,7 +198,7 @@ function SupplierModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && requestClose()}
     >
       <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
@@ -161,7 +207,7 @@ function SupplierModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
             aria-label="Cerrar"
           >
@@ -307,7 +353,7 @@ function SupplierModal({
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >
             Cancelar

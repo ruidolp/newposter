@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Building2,
   CheckCircle2,
@@ -71,10 +71,54 @@ function LocationModal({
   const [form, setForm] = useState<LocationFormState>(emptyForm(location ?? undefined))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const initialRef = useRef(
+    JSON.stringify({
+      name: (location?.name ?? '').trim(),
+      type: location?.type ?? 'STORE',
+      address: (location?.address ?? '').trim(),
+      phone: (location?.phone ?? '').trim(),
+      email: (location?.email ?? '').trim(),
+      hours: (location?.hours ?? '').trim(),
+      notes: (location?.notes ?? '').trim(),
+    })
+  )
 
   function set<K extends keyof LocationFormState>(key: K, val: LocationFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
   }
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: form.name.trim(),
+      type: form.type,
+      address: form.address.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      hours: form.hours.trim(),
+      notes: form.notes.trim(),
+    })
+    return current !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     if (!form.name.trim()) { setError('El nombre es requerido'); return }
@@ -113,14 +157,14 @@ function LocationModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && requestClose()}
     >
       <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">
             {location ? 'Editar Sucursal' : 'Nueva Sucursal'}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Cerrar"
+          <button type="button" onClick={requestClose} aria-label="Cerrar"
             className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
             <X size={16} />
           </button>
@@ -214,7 +258,7 @@ function LocationModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <button type="button" onClick={onClose}
+          <button type="button" onClick={requestClose}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
             Cancelar
           </button>

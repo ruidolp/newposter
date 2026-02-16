@@ -16,6 +16,62 @@ function parseNum(value: string | number | null | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+function toSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+async function resolveUniqueBrandSlug(tenantId: string, raw: string) {
+  const base = toSlug(raw) || 'marca'
+  let candidate = base
+  let suffix = 1
+
+  while (true) {
+    const existing = await db
+      .selectFrom('brands')
+      .select('id')
+      .where('tenant_id', '=', tenantId as any)
+      .where('slug', '=', candidate)
+      .executeTakeFirst()
+
+    if (!existing) return candidate
+    candidate = `${base}-${suffix++}`
+  }
+}
+
+async function resolveBrandId(tenantId: string, rawName: string | null | undefined) {
+  const name = String(rawName ?? '').trim()
+  if (!name) return null
+
+  const existing = await db
+    .selectFrom('brands')
+    .select(['id', 'name'])
+    .where('tenant_id', '=', tenantId as any)
+    .execute()
+
+  const exact = existing.find((b) => b.name.trim().toLowerCase() === name.toLowerCase())
+  if (exact) return exact.id
+
+  const slug = await resolveUniqueBrandSlug(tenantId, name)
+  const created = await db
+    .insertInto('brands')
+    .values({
+      tenant_id: tenantId as any,
+      name,
+      slug,
+      active: true,
+    })
+    .returning(['id'])
+    .executeTakeFirstOrThrow()
+
+  return created.id
+}
+
 // GET /api/purchases — listar compras
 export async function GET(request: NextRequest) {
   try {
@@ -109,13 +165,17 @@ export async function POST(request: NextRequest) {
       if (!productId && item.new_product) {
         // Crear nuevo producto
         const np = item.new_product
+        const rawBarcode = String(np.barcode ?? '').trim()
+        const resolvedName = String(np.name ?? '').trim() || (rawBarcode ? `Producto ${rawBarcode}` : '')
+        const brandId = await resolveBrandId(tenant.id, np.brand_name)
         const newProduct = await db
           .insertInto('products')
           .values({
             tenant_id: tenant.id as any,
-            name: np.name,
+            name: resolvedName || 'Producto sin nombre',
             sku: np.sku || `AUTO-${Date.now()}`,
-            barcode: np.barcode || null,
+            barcode: rawBarcode || null,
+            brand_id: brandId,
             base_price: '0',
             cost: null,
             category_id: np.category_id || null,

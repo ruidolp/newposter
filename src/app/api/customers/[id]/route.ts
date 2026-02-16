@@ -68,9 +68,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    // Verificar RUT único si se cambia
+    if (body.rut?.trim()) {
+      const rutTaken = await db
+        .selectFrom('customers')
+        .select('id')
+        .where('tenant_id', '=', tenant.id as any)
+        .where('rut', '=', body.rut.trim().toUpperCase())
+        .where('id', '!=', id)
+        .executeTakeFirst()
+
+      if (rutTaken) {
+        return NextResponse.json({ error: 'Ya existe un cliente con ese RUT' }, { status: 409 })
+      }
+    }
+
     const updates: Record<string, unknown> = {}
     if (body.name?.trim()) updates.name = body.name.trim()
     if (body.email !== undefined) updates.email = body.email?.trim().toLowerCase() || null
+    if (body.rut !== undefined) updates.rut = body.rut?.trim().toUpperCase() || null
     if (body.phone !== undefined) updates.phone = body.phone?.trim() || null
     if (body.address !== undefined) updates.address = body.address?.trim() || null
 
@@ -100,7 +116,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       action: 'UPDATE_CUSTOMER',
       entityType: 'customer',
       entityId: id,
-      detail: { name: updated.name },
+      detail: { name: updated.name, rut: updated.rut ?? null },
       ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
     })
 

@@ -26,10 +26,24 @@ export default function CheckoutModal({ total, customer, onCustomerChange, onCon
   const [method, setMethod] = useState<PaymentMethod>('CARD')
   const [received, setReceived] = useState('')
   const receivedRef = useRef<HTMLInputElement>(null)
+  const initialRef = useRef(JSON.stringify({ method: 'CARD' as PaymentMethod, received: '' }))
 
   const receivedNum = parseFloat(received.replace(/[^0-9.]/g, '')) || 0
   const change = method === 'CASH' ? Math.max(0, receivedNum - total) : 0
   const canConfirm = method !== 'CASH' || receivedNum >= total
+
+  function hasUnsavedChanges() {
+    return JSON.stringify({ method, received: received.trim() }) !== initialRef.current
+  }
+
+  function requestClose() {
+    if (loading) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     if (method === 'CASH') {
@@ -41,11 +55,14 @@ export default function CheckoutModal({ total, customer, onCustomerChange, onCon
   // Close on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [requestClose])
 
   function handleConfirm() {
     if (!canConfirm || loading) return
@@ -58,7 +75,7 @@ export default function CheckoutModal({ total, customer, onCustomerChange, onCon
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-title"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}
     >
       <div className="w-full max-w-sm overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         {/* Header */}
@@ -66,7 +83,7 @@ export default function CheckoutModal({ total, customer, onCustomerChange, onCon
           <h2 id="checkout-title" className="text-base font-bold text-slate-900">Cobrar</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Cerrar"
             className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >

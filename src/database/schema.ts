@@ -48,6 +48,7 @@ export interface Customers {
   metadata: Generated<Json | null>;
   name: string;
   phone: string | null;
+  rut: string | null;
   tenant_id: string | null;
   updated_at: Generated<Timestamp | null>;
 }

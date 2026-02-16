@@ -70,6 +70,7 @@ export interface Customer {
   tenant_id: string
   name: string
   email: string | null
+  rut: string | null
   phone: string | null
   address: string | null
   metadata: Record<string, unknown>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock, MapPin, User, X } from 'lucide-react'
 
 interface Session {
@@ -43,6 +43,31 @@ function ForceCloseModal({
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const initialRef = useRef('')
+
+  function hasUnsavedChanges() {
+    return note.trim() !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleForce() {
     if (!note.trim()) { setError('La nota es obligatoria'); return }
@@ -65,14 +90,14 @@ function ForceCloseModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/50 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      onClick={(e) => e.target === e.currentTarget && requestClose()}>
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-500" />
             Forzar cierre de caja
           </h2>
-          <button type="button" onClick={onClose} aria-label="Cancelar"
+          <button type="button" onClick={requestClose} aria-label="Cancelar"
             className="rounded p-1 text-slate-400 transition hover:bg-slate-100">
             <X size={15} />
           </button>
@@ -98,7 +123,7 @@ function ForceCloseModal({
           </div>
         </div>
         <div className="flex gap-2 border-t border-slate-200 px-5 py-4">
-          <button type="button" onClick={onClose}
+          <button type="button" onClick={requestClose}
             className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
             Cancelar
           </button>

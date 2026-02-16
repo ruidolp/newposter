@@ -28,6 +28,16 @@ interface ProductHit {
   stock: number
 }
 
+interface BrandOption {
+  id: string
+  name: string
+}
+
+interface CategoryOption {
+  id: string
+  name: string
+}
+
 interface PurchaseRow {
   rowId: string
   query: string
@@ -39,6 +49,9 @@ interface PurchaseRow {
   currentStock: number
   isExisting: boolean
   isNew: boolean
+  newName: string
+  newBarcode: string
+  newBrandName: string
   newSku: string
   newCategoryId: string
   newBasePrice: string
@@ -75,6 +88,9 @@ function emptyRow(): PurchaseRow {
     currentStock: 0,
     isExisting: false,
     isNew: false,
+    newName: '',
+    newBarcode: '',
+    newBrandName: '',
     newSku: '',
     newCategoryId: '',
     newBasePrice: '',
@@ -304,11 +320,15 @@ function SupplierSelector({
 
 function ProductRow({
   row,
+  brands,
+  categories,
   currencyFormat,
   onChange,
   onRemove,
 }: {
   row: PurchaseRow
+  brands: BrandOption[]
+  categories: CategoryOption[]
   currencyFormat: CurrencyFormatConfig
   onChange: (id: string, patch: Partial<PurchaseRow>) => void
   onRemove: (id: string) => void
@@ -347,11 +367,22 @@ function ProductRow({
 
   const hasProduct = row.isExisting || row.isNew
   const stockDisplay = row.currentStock + row.qty
+  const brandDatalistId = `brands-${row.rowId}`
+
+  function looksLikeBarcode(value: string) {
+    const raw = value.trim()
+    if (!raw || /\s/.test(raw)) return false
+    const digitCount = (raw.match(/\d/g) || []).length
+    return raw.length >= 8 && digitCount >= 6
+  }
 
   async function handleSearch(value: string) {
     onChange(row.rowId, {
       query: value,
       isNew: false,
+      newName: '',
+      newBarcode: '',
+      newBrandName: '',
       productId: null,
       productName: '',
       currentStock: 0,
@@ -390,6 +421,9 @@ function ProductRow({
       query: p.name,
       productId: p.id,
       productName: p.name,
+      newName: '',
+      newBarcode: '',
+      newBrandName: '',
       newBasePrice: formatMoneyInput(Number.isFinite(basePrice) ? basePrice : '', currencyFormat),
       currentStock: p.stock,
       isExisting: true,
@@ -400,12 +434,18 @@ function ProductRow({
   }
 
   function createNew() {
+    const raw = row.query.trim()
+    const barcodeQuery = looksLikeBarcode(raw) ? raw : ''
+    const inferredName = barcodeQuery ? '' : raw
     onChange(row.rowId, {
       showDropdown: false,
       isNew: true,
       productId: null,
       isExisting: false,
-      productName: row.query.trim(),
+      productName: inferredName,
+      newName: inferredName,
+      newBarcode: barcodeQuery,
+      newBrandName: '',
       newSku: '',
       newCategoryId: '',
       newBasePrice: '',
@@ -438,30 +478,35 @@ function ProductRow({
   }
 
   return (
-    <div className="grid grid-cols-[minmax(220px,2.6fr)_minmax(128px,1.3fr)_minmax(94px,1fr)_minmax(108px,1.1fr)_minmax(90px,0.9fr)_130px_130px_36px] items-center gap-1 border-b border-slate-100 px-4 py-2 text-sm last:border-b-0">
-      <div className="relative">
-        <input
-          ref={inputRef}
-          value={row.query}
-          onChange={(e) => handleSearch(e.target.value)}
+    <>
+      <div className={`grid grid-cols-[minmax(220px,2.6fr)_minmax(128px,1.3fr)_minmax(94px,1fr)_minmax(108px,1.1fr)_minmax(90px,0.9fr)_130px_130px_36px] items-center gap-1 px-4 py-2 text-sm ${row.isNew ? 'border-b-0' : 'border-b border-slate-100 last:border-b-0'}`}>
+        <div className="relative">
+          <input
+            ref={inputRef}
+            value={row.query}
+            onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => {
             if (row.results.length > 0) onChange(row.rowId, { showDropdown: true })
           }}
-          readOnly={row.isExisting}
+          readOnly={row.isExisting || row.isNew}
           placeholder="Nombre, SKU o código de barras…"
           className={`h-9 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 ${
-            row.isExisting ? 'cursor-default bg-slate-50 text-slate-500' : ''
+            row.isExisting || row.isNew ? 'cursor-default bg-slate-50 text-slate-500' : ''
           } ${row.isNew ? 'font-mono' : ''}`}
         />
-        {row.isExisting && (
+        {(row.isExisting || row.isNew) && (
           <button
             type="button"
-            title="Cambiar producto"
+            title={row.isExisting ? 'Cambiar producto' : 'Cambiar búsqueda'}
             onClick={() =>
               onChange(row.rowId, {
                 isExisting: false,
+                isNew: false,
                 productId: null,
                 productName: '',
+                newName: '',
+                newBarcode: '',
+                newBrandName: '',
                 query: '',
                 currentStock: 0,
               })
@@ -546,13 +591,76 @@ function ProductRow({
         aria-label="Eliminar fila"
       >
         <Trash2 size={14} />
-      </button>
-    </div>
+        </button>
+      </div>
+      {row.isNew && (
+        <div className="grid gap-2 border-b border-fuchsia-100 bg-fuchsia-50 px-4 pb-3 md:grid-cols-4">
+          <div className="md:col-span-4 flex items-center gap-1.5 pt-1 text-[11px] font-medium text-fuchsia-700">
+            <Info size={12} />
+            <span>Creando producto nuevo</span>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">Nombre Producto</label>
+            <input
+              value={row.newName}
+              onChange={(e) =>
+                onChange(row.rowId, {
+                  newName: e.target.value,
+                  productName: e.target.value,
+                })}
+              placeholder="Ej: Galletas 150g"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">Codigo de Barras</label>
+            <input
+              value={row.newBarcode}
+              onChange={(e) => onChange(row.rowId, { newBarcode: e.target.value })}
+              placeholder="Ej: 7801234567890"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">Marca</label>
+            <input
+              list={brandDatalistId}
+              value={row.newBrandName}
+              onChange={(e) => onChange(row.rowId, { newBrandName: e.target.value })}
+              placeholder="Seleccionar o escribir marca"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            />
+            <datalist id={brandDatalistId}>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.name} />
+              ))}
+            </datalist>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">Categoria</label>
+            <select
+              value={row.newCategoryId}
+              onChange={(e) => onChange(row.rowId, { newCategoryId: e.target.value })}
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
+            >
+              <option value="">Sin categoria</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
 export default function NuevaCompraPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [brands, setBrands] = useState<BrandOption[]>([])
+  const [categories, setCategories] = useState<CategoryOption[]>([])
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [notes, setNotes] = useState('')
@@ -566,6 +674,8 @@ export default function NuevaCompraPage() {
 
   useEffect(() => {
     fetchSuppliers()
+    fetchBrands()
+    fetchCategories()
     fetchSettings()
   }, [])
 
@@ -587,6 +697,28 @@ export default function NuevaCompraPage() {
       setSuppliers(data.suppliers ?? [])
     } catch {
       setSuppliers([])
+    }
+  }
+
+  async function fetchBrands() {
+    try {
+      const res = await fetch('/api/brands')
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setBrands(data.brands ?? [])
+    } catch {
+      setBrands([])
+    }
+  }
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch('/api/categories')
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setCategories((data.categories ?? []).map((c: any) => ({ id: c.id, name: c.name })))
+    } catch {
+      setCategories([])
     }
   }
 
@@ -666,25 +798,38 @@ export default function NuevaCompraPage() {
       return
     }
 
-    const items = validRows.map((r) => ({
-      product_id: r.isExisting ? r.productId : null,
-      product_name: r.productName,
-      quantity: r.qty,
-      purchase_price: parseMoneyInput(r.purchasePriceGross, currencyFormat) || 0,
-      sale_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
-      previous_stock: r.currentStock,
-      new_stock: r.currentStock + r.qty,
-      ...(r.isNew
-        ? {
-            new_product: {
-              name: r.productName,
-              sku: r.newSku || null,
-              category_id: r.newCategoryId || null,
-              base_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
-            },
-          }
-        : {}),
-    }))
+    const invalidNewRows = validRows.filter((r) => r.isNew && !r.newName.trim() && !r.newBarcode.trim())
+    if (invalidNewRows.length > 0) {
+      toast('error', 'Los productos nuevos deben tener nombre o codigo de barras.')
+      return
+    }
+
+    const items = validRows.map((r) => {
+      const rawName = r.newName.trim()
+      const rawBarcode = r.newBarcode.trim()
+      const resolvedNewName = rawName || (rawBarcode ? `Producto ${rawBarcode}` : '')
+      return {
+        product_id: r.isExisting ? r.productId : null,
+        product_name: r.isNew ? resolvedNewName : r.productName,
+        quantity: r.qty,
+        purchase_price: parseMoneyInput(r.purchasePriceGross, currencyFormat) || 0,
+        sale_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
+        previous_stock: r.currentStock,
+        new_stock: r.currentStock + r.qty,
+        ...(r.isNew
+          ? {
+              new_product: {
+                name: resolvedNewName,
+                sku: r.newSku || null,
+                barcode: rawBarcode || null,
+                brand_name: r.newBrandName.trim() || null,
+                category_id: r.newCategoryId || null,
+                base_price: parseMoneyInput(r.newBasePrice, currencyFormat) || 0,
+              },
+            }
+          : {}),
+      }
+    })
 
     const extra_items = extraCharges
       .map((item) => ({
@@ -839,7 +984,15 @@ export default function NuevaCompraPage() {
               <span />
             </div>
             {rows.map((row) => (
-              <ProductRow key={row.rowId} row={row} currencyFormat={currencyFormat} onChange={updateRow} onRemove={removeRow} />
+              <ProductRow
+                key={row.rowId}
+                row={row}
+                brands={brands}
+                categories={categories}
+                currencyFormat={currencyFormat}
+                onChange={updateRow}
+                onRemove={removeRow}
+              />
             ))}
           </div>
         </div>
@@ -848,28 +1001,31 @@ export default function NuevaCompraPage() {
           <button
             type="button"
             onClick={addRow}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
+            className="inline-flex min-w-[168px] items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >
             <Plus size={14} /> Agregar producto
           </button>
         </div>
 
-        <div className="border-t border-slate-200 px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="border-t border-slate-200">
+          <div className="px-4 pt-3">
             <h3 className="text-sm font-semibold text-slate-800">Otros cargos de factura (no producto)</h3>
+          </div>
+          <div className="px-4 py-3">
             <button
               type="button"
               onClick={addExtraCharge}
-              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex min-w-[168px] items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
             >
-              <Plus size={13} /> Agregar cargo
+              <Plus size={14} /> Agregar cargo
             </button>
           </div>
 
-          {extraCharges.length === 0 ? (
-            <p className="text-sm text-slate-500">Sin cargos adicionales</p>
-          ) : (
-            <div className="space-y-2">
+          <div className="px-4 pb-3">
+            {extraCharges.length === 0 ? (
+              <p className="text-sm text-slate-500">Sin cargos adicionales</p>
+            ) : (
+              <div className="space-y-2">
               <div className="grid grid-cols-[1fr_130px_130px_36px] gap-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">
                 <span />
                 <span className="text-right">Precio Compra Neto</span>
@@ -896,8 +1052,9 @@ export default function NuevaCompraPage() {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">

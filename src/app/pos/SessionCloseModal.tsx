@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, CreditCard, Banknote, ArrowRightLeft, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react'
 
 export interface SessionInfo {
@@ -42,6 +42,7 @@ export default function SessionCloseModal({ session, onClose, onClosed }: Props)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState<'review' | 'confirm'>('review')
+  const initialRef = useRef(JSON.stringify({ closingAmount: '', notes: '', step: 'review' as 'review' | 'confirm' }))
 
   useEffect(() => {
     fetch(`/api/pos/sessions/${session.id}`)
@@ -70,6 +71,34 @@ export default function SessionCloseModal({ session, onClose, onClosed }: Props)
     const m = Math.floor((ms % 3600000) / 60000)
     return h > 0 ? `${h}h ${m}m` : `${m}m`
   })()
+
+  function hasUnsavedChanges() {
+    return JSON.stringify({
+      closingAmount: closingAmount.trim(),
+      notes: notes.trim(),
+      step,
+    }) !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleClose() {
     setSaving(true); setError('')
@@ -101,7 +130,7 @@ export default function SessionCloseModal({ session, onClose, onClosed }: Props)
             <h2 className="text-base font-bold text-slate-900">Cierre de Caja</h2>
             <p className="text-xs text-slate-500">{session.location_name} · {duration} de turno</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Cancelar"
+          <button type="button" onClick={requestClose} aria-label="Cancelar"
             className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
             <X size={16} />
           </button>
@@ -253,7 +282,7 @@ export default function SessionCloseModal({ session, onClose, onClosed }: Props)
                 <CheckCircle2 size={16} />
                 Continuar con cierre
               </button>
-              <button type="button" onClick={onClose}
+              <button type="button" onClick={requestClose}
                 className="w-full rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
                 Cancelar
               </button>

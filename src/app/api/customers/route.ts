@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
         eb.or([
           eb('name', 'ilike', `%${search}%`),
           eb('email', 'ilike', `%${search}%`),
+          eb('rut', 'ilike', `%${search}%`),
           eb('phone', 'ilike', `%${search}%`),
         ])
       )
@@ -125,12 +126,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Verificar RUT único si se provee
+    if (body.rut?.trim()) {
+      const existingRut = await db
+        .selectFrom('customers')
+        .select('id')
+        .where('tenant_id', '=', tenant.id as any)
+        .where('rut', '=', body.rut.trim().toUpperCase())
+        .executeTakeFirst()
+
+      if (existingRut) {
+        return NextResponse.json({ error: 'Ya existe un cliente con ese RUT' }, { status: 409 })
+      }
+    }
+
     const customer = await db
       .insertInto('customers')
       .values({
         tenant_id: tenant.id as any,
         name: body.name.trim(),
         email: body.email?.trim().toLowerCase() || null,
+        rut: body.rut?.trim().toUpperCase() || null,
         phone: body.phone?.trim() || null,
         address: body.address?.trim() || null,
       })
@@ -144,7 +160,7 @@ export async function POST(request: NextRequest) {
       action: 'CREATE_CUSTOMER',
       entityType: 'customer',
       entityId: customer.id,
-      detail: { name: customer.name, email: customer.email, phone: customer.phone },
+      detail: { name: customer.name, email: customer.email, rut: customer.rut, phone: customer.phone },
       ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
     })
 

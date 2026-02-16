@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
         cost: processedData.cost !== null && processedData.cost !== undefined
           ? processedData.cost.toString()
           : null,
+        brand_id: processedData.brand_id ?? body.brand_id ?? null,
         category_id: processedData.category_id || null,
         stock: processedData.stock || 0,
         low_stock_alert: processedData.low_stock_alert || 5,

@@ -1,6 +1,6 @@
 'use client'
 
-import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -112,10 +112,41 @@ function CreateModal({
   const [error, setError] = useState('')
   const [showPass, setShowPass] = useState(false)
   const roles = allowedRolesFor(actorRole)
+  const initialRef = useRef(JSON.stringify({ name: '', email: '', password: '', role: 'STAFF' as Role }))
 
   function set<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
   }
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      password: form.password,
+      role: form.role,
+    })
+    return current !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     if (!form.name.trim()) return setError('El nombre es requerido')
@@ -146,14 +177,14 @@ function CreateModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && requestClose()}
     >
       <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">Nuevo Usuario</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
             aria-label="Cerrar"
           >
@@ -236,7 +267,7 @@ function CreateModal({
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >
             Cancelar
@@ -353,10 +384,49 @@ function UserDrawer({
   const [showPass, setShowPass] = useState(false)
   const [savingPass, setSavingPass] = useState(false)
   const [passError, setPassError] = useState('')
+  const initialRef = useRef(
+    JSON.stringify({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+    })
+  )
 
   function setF<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: val }))
   }
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: form.name,
+      email: form.email,
+      role: form.role,
+      active: form.active,
+    })
+    if (current !== initialRef.current) return true
+    return password.trim().length > 0
+  }
+
+  function requestClose() {
+    if (saving || savingPass) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSaveEdit() {
     if (!form.name.trim()) return setEditError('El nombre es requerido')
@@ -375,6 +445,12 @@ function UserDrawer({
         const e = await res.json().catch(() => ({ error: 'Error al actualizar usuario' }))
         throw new Error(e.error || 'Error al actualizar usuario')
       }
+      initialRef.current = JSON.stringify({
+        name: form.name,
+        email: form.email,
+        role: form.role,
+        active: form.active,
+      })
       onSaved(await res.json())
       onToast('success', 'Usuario actualizado')
     } catch (e: unknown) {
@@ -426,7 +502,7 @@ function UserDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] bg-slate-900/40" onClick={onClose} />
+      <div className="fixed inset-0 z-[80] bg-slate-900/40" onClick={requestClose} />
       <aside className="fixed inset-y-0 right-0 z-[81] w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
           <div>
@@ -435,7 +511,7 @@ function UserDrawer({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >
             <X size={16} />

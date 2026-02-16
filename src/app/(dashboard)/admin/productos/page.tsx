@@ -18,6 +18,7 @@ import {
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface Category { id: string; name: string }
+interface Brand { id: string; name: string; slug: string }
 
 interface Product {
   id: string
@@ -31,6 +32,7 @@ interface Product {
   low_stock_alert: number
   track_stock: boolean
   active: boolean
+  brand_id: string | null
   category_id: string | null
   metadata: Record<string, unknown> | null
   created_at: string
@@ -135,6 +137,7 @@ function emptyForm() {
     base_price: '', cost: '', stock: '0', low_stock_alert: '5',
     track_stock: true, active: true, online_visible: true,
     ecommerce_images: [] as string[],
+    brand_id: '',
     category_ids: [] as string[],
   }
 }
@@ -240,10 +243,11 @@ function ColSelector({ visible, onChange }: { visible: ColId[]; onChange: (c: Co
 // ─── ProductModal ────────────────────────────────────────────────────────────
 
 function ProductModal({
-  product, categories, currencyFormat, onClose, onSaved,
+  product, categories, brands, currencyFormat, onClose, onSaved,
 }: {
   product: Product | null
   categories: Category[]
+  brands: Brand[]
   currencyFormat: CurrencyFormatConfig
   onClose: () => void
   onSaved: (p: Product) => void
@@ -262,6 +266,7 @@ function ProductModal({
           low_stock_alert: String(product.low_stock_alert),
           track_stock: product.track_stock,
           active: product.active,
+          brand_id: product.brand_id ?? '',
           online_visible: isOnlineVisible(product),
           ecommerce_images: Array.isArray((product.metadata as any)?.ecommerce_images)
             ? ((product.metadata as any).ecommerce_images as string[]).filter((x) => typeof x === 'string')
@@ -282,10 +287,22 @@ function ProductModal({
   const [creatingCat, setCreatingCat] = useState(false)
   const [catSearch, setCatSearch] = useState('')
   const [localCategories, setLocalCategories] = useState(categories)
+  const [brandSearch, setBrandSearch] = useState('')
+  const [localBrands, setLocalBrands] = useState(brands)
   const selectedCategories = localCategories.filter(c => form.category_ids.includes(c.id))
   const availableCategories = localCategories.filter(c =>
     !form.category_ids.includes(c.id) && c.name.toLowerCase().includes(catSearch.toLowerCase().trim())
   )
+  const selectedBrand = localBrands.find((b) => b.id === form.brand_id) ?? null
+  const availableBrands = localBrands.filter((b) =>
+    b.name.toLowerCase().includes(brandSearch.toLowerCase().trim())
+  )
+
+  useEffect(() => {
+    if (selectedBrand && !brandSearch.trim()) {
+      setBrandSearch(selectedBrand.name)
+    }
+  }, [selectedBrand, brandSearch])
 
   function normalizeFormForDirtyCheck(currentForm: typeof form) {
     return {
@@ -320,6 +337,18 @@ function ProductModal({
   }
 
   useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
+
+  useEffect(() => {
     initialFormRef.current = JSON.stringify(normalizeFormForDirtyCheck(form))
     // Solo se recalcula al abrir modal o cambiar producto de origen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,6 +357,12 @@ function ProductModal({
   function set(field: string, value: unknown) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => { const n = { ...e }; delete n[field]; return n })
+  }
+
+  function handleBrandInputChange(value: string) {
+    setBrandSearch(value)
+    const match = localBrands.find((b) => b.name.toLowerCase() === value.trim().toLowerCase())
+    set('brand_id', match?.id ?? '')
   }
 
   function setMoney(field: 'base_price' | 'cost', value: string) {
@@ -436,6 +471,32 @@ function ProductModal({
     if (Object.keys(e).length) { setErrors(e); return }
     setSaving(true)
     try {
+      const typedBrand = brandSearch.trim()
+      let resolvedBrandId: string | null = null
+
+      if (typedBrand) {
+        const existingBrand = localBrands.find((b) => b.name.toLowerCase() === typedBrand.toLowerCase())
+        if (existingBrand) {
+          resolvedBrandId = existingBrand.id
+        } else {
+          const createRes = await fetch('/api/brands', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: typedBrand }),
+          })
+
+          if (!createRes.ok) {
+            const data = await createRes.json().catch(() => ({}))
+            throw new Error(data.error || 'No se pudo crear la marca')
+          }
+
+          const createdBrand = await createRes.json()
+          resolvedBrandId = createdBrand.id
+          setLocalBrands((prev) => [...prev, createdBrand].sort((a, b) => a.name.localeCompare(b.name, 'es')))
+          setBrandSearch(createdBrand.name)
+        }
+      }
+
       const existingMeta = (product?.metadata as any) ?? {}
       const body = {
         name: form.name.trim(),
@@ -448,6 +509,7 @@ function ProductModal({
         low_stock_alert: parseInt(form.low_stock_alert) || 5,
         track_stock: form.track_stock,
         active: form.active,
+        brand_id: resolvedBrandId,
         category_id: form.category_ids[0] ?? null,
         metadata: {
           ...existingMeta,
@@ -520,21 +582,40 @@ function ProductModal({
                 <span>{form.active ? 'ACTIVO' : 'INACTIVO'}</span>
               </label>
             </div>
-            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2">
-              <div className="space-y-1">
+            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-3">
+              <div className="space-y-1 md:col-span-2">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nombre del producto *</label>
                 <input className={`h-10 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-2 focus:ring-fuchsia-100 ${errors.name ? 'border-rose-400' : 'border-slate-200 focus:border-fuchsia-500'}`} value={form.name}
                   onChange={e => set('name', e.target.value)} placeholder="Ej: Bebida Cola 500ml" />
                 {errors.name && <span className="text-xs text-rose-600">{errors.name}</span>}
               </div>
               <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Marca</label>
+                <div className="relative">
+                  <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    list="product-brand-options"
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100"
+                    placeholder="Seleccionar o escribir marca..."
+                    value={brandSearch}
+                    onChange={(e) => handleBrandInputChange(e.target.value)}
+                  />
+                  <datalist id="product-brand-options">
+                    <option value="">Sin marca</option>
+                    {availableBrands.map((b) => (
+                      <option key={b.id} value={b.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2">
+              <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">SKU *</label>
                 <input className={`h-10 w-full rounded-lg border px-3 font-mono text-sm outline-none transition focus:ring-2 focus:ring-fuchsia-100 ${errors.sku ? 'border-rose-400' : 'border-slate-200 focus:border-fuchsia-500'}`} value={form.sku}
                   onChange={e => set('sku', e.target.value)} placeholder="Ej: BEB-001" />
                 {errors.sku && <span className="text-xs text-rose-600">{errors.sku}</span>}
               </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Código de Barras</label>
                 <input className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-100" value={form.barcode}
@@ -953,6 +1034,31 @@ function StockModal({ product, onClose, onSaved }: {
   const [qty, setQty] = useState('')
   const [type, setType] = useState<'add' | 'set'>('add')
   const [saving, setSaving] = useState(false)
+  const initialRef = useRef(JSON.stringify({ qty: '', type: 'add' as 'add' | 'set' }))
+
+  function hasUnsavedChanges() {
+    return JSON.stringify({ qty: qty.trim(), type }) !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     const n = parseInt(qty)
@@ -977,11 +1083,11 @@ function StockModal({ product, onClose, onSaved }: {
     : product.stock
 
   return (
-    <div className="fixed inset-0 z-[320] flex items-center justify-center bg-slate-950/40 p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 z-[320] flex items-center justify-center bg-slate-950/40 p-4" onClick={e => { if (e.target === e.currentTarget) requestClose() }}>
       <div className="w-full max-w-[380px] rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <span className="text-base font-semibold text-slate-900">Ajustar Stock</span>
-          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={onClose}><X size={16} /></button>
+          <button className="rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" onClick={requestClose}><X size={16} /></button>
         </div>
         <div className="space-y-4 px-4 py-3">
           <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--a-bg-2)', borderRadius: 'var(--a-radius)', fontFamily: 'var(--a-font-mono)', fontSize: 12 }}>
@@ -1020,7 +1126,7 @@ function StockModal({ product, onClose, onSaved }: {
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
-          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={onClose}>Cancelar</button>
+          <button className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50" onClick={requestClose}>Cancelar</button>
           <button className="inline-flex h-10 items-center rounded-lg bg-fuchsia-600 px-4 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60" onClick={handleSave} disabled={saving || qty === ''}>
             {saving ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : 'Actualizar Stock'}
           </button>
@@ -1035,6 +1141,7 @@ function StockModal({ product, onClose, onSaved }: {
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
@@ -1079,6 +1186,7 @@ export default function ProductosPage() {
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories ?? []))
+    fetch('/api/brands').then(r => r.json()).then(d => setBrands(d.brands ?? []))
   }, [])
 
   useEffect(() => {
@@ -1530,6 +1638,7 @@ export default function ProductosPage() {
         <ProductModal
           product={modal.mode === 'edit' ? modal.product : null}
           categories={categories}
+          brands={brands}
           currencyFormat={currencyFormat}
           onClose={closeModal}
           onSaved={handleSaved}

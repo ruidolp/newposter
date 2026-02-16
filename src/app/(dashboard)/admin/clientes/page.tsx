@@ -17,6 +17,7 @@ interface Customer {
   id: string
   name: string
   email: string | null
+  rut: string | null
   phone: string | null
   address: string | null
   created_at: string
@@ -37,12 +38,13 @@ interface Toast {
 type CustomerFormState = {
   name: string
   email: string
+  rut: string
   phone: string
   address: string
 }
 
 function emptyForm(): CustomerFormState {
-  return { name: '', email: '', phone: '', address: '' }
+  return { name: '', email: '', rut: '', phone: '', address: '' }
 }
 
 // ── Toasts ────────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ function CustomerModal({
 }) {
   const [form, setForm] = useState<CustomerFormState>(
     customer
-      ? { name: customer.name, email: customer.email ?? '', phone: customer.phone ?? '', address: customer.address ?? '' }
+      ? { name: customer.name, email: customer.email ?? '', rut: customer.rut ?? '', phone: customer.phone ?? '', address: customer.address ?? '' }
       : emptyForm()
   )
   const [tierOverride, setTierOverride] = useState<string>(
@@ -92,17 +94,62 @@ function CustomerModal({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const initialRef = useRef(
+    JSON.stringify({
+      name: (customer?.name ?? '').trim(),
+      email: (customer?.email ?? '').trim(),
+      rut: (customer?.rut ?? '').trim(),
+      phone: (customer?.phone ?? '').trim(),
+      address: (customer?.address ?? '').trim(),
+      tierOverride: ((customer?.metadata?.loyalty_override as string | undefined) ?? '').trim(),
+    })
+  )
 
   function setField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      rut: form.rut.trim().toUpperCase(),
+      phone: form.phone.trim(),
+      address: form.address.trim(),
+      tierOverride: tierOverride.trim(),
+    })
+    return current !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     if (!form.name.trim()) { setError('El nombre es requerido'); return }
     setSaving(true); setError('')
     try {
       const isEdit = Boolean(customer)
-      const body: Record<string, unknown> = { ...form }
+      const body: Record<string, unknown> = {
+        ...form,
+        rut: form.rut.trim().toUpperCase() || null,
+      }
       if (isEdit) body.loyalty_override = tierOverride || null
       const res = await fetch(isEdit ? `/api/customers/${customer!.id}` : '/api/customers', {
         method: isEdit ? 'PATCH' : 'POST',
@@ -123,11 +170,11 @@ function CustomerModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      onClick={(e) => e.target === e.currentTarget && requestClose()}>
       <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">{customer ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
-          <button type="button" onClick={onClose} aria-label="Cerrar"
+          <button type="button" onClick={requestClose} aria-label="Cerrar"
             className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
             <X size={16} />
           </button>
@@ -147,6 +194,12 @@ function CustomerModal({
               <input id="customer_email" name="customer_email" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)}
                 autoComplete="email" placeholder="cliente@email.com"
                 className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="customer_rut" className="text-xs font-medium uppercase tracking-wide text-slate-500">RUT</label>
+              <input id="customer_rut" name="customer_rut" value={form.rut} onChange={(e) => setField('rut', e.target.value)}
+                autoComplete="off" placeholder="12.345.678-9"
+                className="h-10 w-full rounded-md border border-slate-300 px-3 font-mono text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200" />
             </div>
             <div className="space-y-1.5">
               <label htmlFor="customer_phone" className="text-xs font-medium uppercase tracking-wide text-slate-500">Teléfono</label>
@@ -175,7 +228,7 @@ function CustomerModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <button type="button" onClick={onClose}
+          <button type="button" onClick={requestClose}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500">
             Cancelar
           </button>
@@ -362,7 +415,7 @@ export default function ClientesPage() {
             <input
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar por nombre, email o teléfono…"
+              placeholder="Buscar por nombre, email, RUT o teléfono…"
               className="h-9 w-full min-w-[240px] rounded-md border border-slate-300 pl-8 pr-3 text-sm outline-none transition focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200"
             />
           </div>
@@ -391,6 +444,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nivel</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Compras</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Email</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">RUT</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Teléfono</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Registrado</th>
                 </tr>
@@ -421,6 +475,7 @@ export default function ClientesPage() {
                         ? <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-sky-700 hover:underline">{c.email}</a>
                         : <span className="text-slate-400">—</span>}
                     </td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.rut ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.phone ?? '—'}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {new Date(c.created_at).toLocaleDateString('es-CL')}

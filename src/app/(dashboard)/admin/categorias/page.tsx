@@ -1,6 +1,6 @@
 'use client'
 
-import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, Plus, Search, Tags, Trash2, X } from 'lucide-react'
 
 interface Category {
@@ -85,6 +85,42 @@ function CategoryModal({
   const [description, setDescription] = useState(category?.description ?? '')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const initialRef = useRef(
+    JSON.stringify({
+      name: (category?.name ?? '').trim(),
+      slug: (category?.slug ?? '').trim(),
+      description: (category?.description ?? '').trim(),
+    })
+  )
+
+  function hasUnsavedChanges() {
+    const current = JSON.stringify({
+      name: name.trim(),
+      slug: slug.trim(),
+      description: description.trim(),
+    })
+    return current !== initialRef.current
+  }
+
+  function requestClose() {
+    if (saving) return
+    if (hasUnsavedChanges()) {
+      const ok = window.confirm('Tienes cambios sin guardar. ¿Salir y descartarlos?')
+      if (!ok) return
+    }
+    onClose()
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [requestClose])
 
   async function handleSave() {
     if (!name.trim()) {
@@ -123,14 +159,14 @@ function CategoryModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && requestClose()}
     >
       <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">{category ? 'Editar Categoría' : 'Nueva Categoría'}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
             aria-label="Cerrar"
           >
@@ -199,7 +235,7 @@ function CategoryModal({
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500"
           >
             Cancelar
