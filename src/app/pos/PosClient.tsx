@@ -125,10 +125,9 @@ export default function PosClient({ storeName, userName, userId, userRole, print
     return () => clearInterval(intervalId)
   }, [])
 
-  // Load initial products (only once session is ready)
+  // Focus search once session is ready; do not preload full catalog.
   useEffect(() => {
     if (!session) return
-    fetchProducts('')
     searchRef.current?.focus()
   }, [session])
 
@@ -146,6 +145,10 @@ export default function PosClient({ storeName, userName, userId, userRole, print
     const val = e.target.value
     setQuery(val)
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (!val.trim()) {
+      setProducts([])
+      return
+    }
     timerRef.current = setTimeout(() => fetchProducts(val), 200)
   }
 
@@ -158,7 +161,7 @@ export default function PosClient({ storeName, userName, userId, userRole, print
       if (exact) {
         addToCart(exact)
         setQuery('')
-        fetchProducts('')
+        setProducts([])
         searchRef.current?.focus()
       }
     }
@@ -269,7 +272,7 @@ export default function PosClient({ storeName, userName, userId, userRole, print
     setCustomer(null)
     setResult(null)
     setQuery('')
-    fetchProducts('')
+    setProducts([])
     setTimeout(() => searchRef.current?.focus(), 100)
   }
 
@@ -421,7 +424,7 @@ export default function PosClient({ storeName, userName, userId, userRole, print
             ) : products.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
                 <Package size={28} aria-hidden="true" />
-                <p className="text-sm">Sin resultados</p>
+                <p className="text-sm">{query.trim() ? 'Sin resultados' : 'Agrega productos'}</p>
               </div>
             ) : (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" role="list">
